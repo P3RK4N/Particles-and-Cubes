@@ -4,6 +4,12 @@ using UnityEngine;
 using UnityEditor.TerrainTools;
 using System.Reflection.Emit;
 using System;
+using Unity.VisualScripting;
+using UnityEditor.UIElements;
+using static UnityEngine.GraphicsBuffer;
+
+
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -27,10 +33,10 @@ public class CPS : MonoBehaviour
         Point,
         Sphere,
         Plane,
-        Cube,
+        Cuboid,
     };
 
-    public enum FallofType
+    public enum FalloffType
     {
         Root,
         Linear,
@@ -59,38 +65,49 @@ public class CPS : MonoBehaviour
     /// Type and parameters of scalar (exact, ranged, gaussian)
     /// </summary>
     /// <typeparam name="Scalar">1-4 Dimensional Value</typeparam>
+    [Serializable]
     public struct ScalarGenerator<Scalar>
     {
-        public ScalarGeneratorType Type;
+        [SerializeField] public ScalarGeneratorType Type;
 
         // Exact
-        public Scalar ExactScalar;
+        [SerializeField] public Scalar ExactScalar;
         
+        // Ranged
+        [SerializeField] public bool Uniform;
+        [SerializeField] public Scalar BottomScalar;
+        [SerializeField] public Scalar TopScalar;
+
         // TODO: Expand
     }
 
     /// <summary>
     /// Type and parameters of implicit shape (dot, plane, sphere, cube)
     /// </summary>
+    [Serializable]
     public struct FunctionGenerator
     {
-        public FunctionGeneratorType Type;
+        [SerializeField] public FunctionGeneratorType Type;
 
-        // Identity
-        public Vector3 Identity;
+        // Point && Plane && Sphere && Cube
+        [SerializeField] public Vector3 CenterOffset;
         
+        // Sphere
+        [SerializeField] public float Radius;
+
         // TODO: Expand
     }
 
     /// <summary>
     /// Type of force falloff (eg. linear), Force intensity and function/implicit shape where distance is equal to 0
     /// </summary>
+    [Serializable]
     public struct ForceFieldDescriptor
     {
-        public FallofType Type;
-        public float Intensity;
-        public Vector3 Coefficients;
-        FunctionGenerator Generator;
+        [SerializeField] public FalloffType Type;
+        [SerializeField] public float Intensity;
+        [SerializeField] public Vector3 Coefficients;
+        [SerializeField] FunctionGenerator Generator;
     }
 
 #endregion 
@@ -100,8 +117,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Template of shader which will simulate particles
     /// </summary>
-    public ComputeShader CPSSimulatorTemplate { get; set; }
-
+    [SerializeField] public ComputeShader CPSSimulatorTemplate;
 #endregion
 
 #region Setting Fields
@@ -109,12 +125,17 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Decides whether CPS moves with root or not
     /// </summary>
-    public SimulationSpaceType SimulationSpace { get; set; }
+    [SerializeField] public SimulationSpaceType         SimulationSpace;
 
     /// <summary>
     /// Type of rendering
     /// </summary>
-    public CPSRenderType RenderType { get; set; }
+    [SerializeField] public CPSRenderType               RenderType;
+
+    /// <summary>
+    /// Whether to draw helper gui
+    /// </summary>
+    [SerializeField] public bool                        DrawGUI;
 
 #endregion
 
@@ -123,36 +144,39 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Initial velocity stuff
     /// </summary>
-    [NonSerialized] public ScalarGenerator<Vector3> StartVelocityGenerator;
+    [SerializeField] public ScalarGenerator<Vector3>    StartVelocityGenerator;
 
     /// <summary>
     /// Initial lifetime stuff
     /// </summary>
-    [NonSerialized] public ScalarGenerator<float> StartLifetimeGenerator;
+    [SerializeField] public ScalarGenerator<float>      StartLifetimeGenerator;
 
     /// <summary>
     /// Initial size stuff
     /// </summary>
-    [NonSerialized] public ScalarGenerator<Vector3> StartSizeGenerator;
+    [SerializeField] public ScalarGenerator<Vector3>    StartSizeGenerator;
 
     /// <summary>
     /// Initial rotation stuff
     /// </summary>
-    [NonSerialized] public ScalarGenerator<Vector3> StartRotationGenerator;
+    [SerializeField] public ScalarGenerator<Vector3>    StartRotationGenerator;
 
     /// <summary>
     /// Initial position stuff (Shape in which particles generate)
     /// </summary>
-    [NonSerialized] public FunctionGenerator StartPositionGenerator;
+    [SerializeField] public FunctionGenerator           StartPositionGenerator;
 
 #endregion
 
 #region SimulationFields
 
+    [SerializeField] public ulong MaximumParticleCount;
+    [SerializeField] public ulong CurrentParticleCount = 0;
+
     /// <summary>
     /// Environmental ForceField stuff (walls, attractors, repulsors)
     /// </summary>
-    [NonSerialized] public List<ForceFieldDescriptor> ForceFields;
+    [SerializeField] public List<ForceFieldDescriptor> ForceFields;
 
 #endregion
 
@@ -168,8 +192,75 @@ public class CPS : MonoBehaviour
 
     void Awake()
     {
+        Debug.Assert(CPSSimulatorTemplate != null, "CPSSimulatorTemplate should not be null!");
+
         CPSSimulator = Instantiate(CPSSimulatorTemplate);
         //CPSSimulationBuffer = new ComputeBuffer();
+    }
+
+    void OnPostRender()
+    {
+    }
+
+    void OnDrawGizmos()
+    {
+        if(!DrawGUI) return;
+
+        DrawStartPosition();
+    }
+
+    private void DrawStartPosition()
+    {
+        switch(StartPositionGenerator.Type)
+        {
+            case FunctionGeneratorType.Point:
+            {
+                DebugExtension.DrawPoint(transform.position + StartPositionGenerator.CenterOffset, 0.3f); break;
+            }
+            case FunctionGeneratorType.Sphere:
+            {
+                Gizmos.DrawWireSphere(transform.position + StartPositionGenerator.CenterOffset, StartPositionGenerator.Radius); break;
+            }
+            case FunctionGeneratorType.Cuboid:
+            case FunctionGeneratorType.Plane:
+            default:
+            {
+                break;
+            }
+        }
+    }
+
+    void DrawCuboid(Vector3 bottom, Vector3 top)
+    {
+        Gizmos.color = Color.white;
+
+        Vector3[] corners = new Vector3[8];
+        corners[0] = new Vector3(bottom.x, bottom.y, bottom.z);
+        corners[1] = new Vector3(top.x, bottom.y, bottom.z);
+        corners[2] = new Vector3(bottom.x, top.y, bottom.z);
+        corners[3] = new Vector3(top.x, top.y, bottom.z);
+        corners[4] = new Vector3(bottom.x, bottom.y, top.z);
+        corners[5] = new Vector3(top.x, bottom.y, top.z);
+        corners[6] = new Vector3(bottom.x, top.y, top.z);
+        corners[7] = new Vector3(top.x, top.y, top.z);
+
+        // Draw bottom edges
+        Gizmos.DrawLine(corners[0], corners[1]);
+        Gizmos.DrawLine(corners[1], corners[3]);
+        Gizmos.DrawLine(corners[3], corners[2]);
+        Gizmos.DrawLine(corners[2], corners[0]);
+
+        // Draw top edges
+        Gizmos.DrawLine(corners[4], corners[5]);
+        Gizmos.DrawLine(corners[5], corners[7]);
+        Gizmos.DrawLine(corners[7], corners[6]);
+        Gizmos.DrawLine(corners[6], corners[4]);
+
+        // Draw vertical edges connecting top and bottom
+        Gizmos.DrawLine(corners[0], corners[4]);
+        Gizmos.DrawLine(corners[1], corners[5]);
+        Gizmos.DrawLine(corners[2], corners[6]);
+        Gizmos.DrawLine(corners[3], corners[7]);
     }
 }
 
@@ -178,6 +269,7 @@ public class CPS : MonoBehaviour
 [CustomEditor(typeof(CPS))]
 public class CPSEditor : Editor
 {
+
 #region Statics
 
     static GUIStyle TitleStyle;
@@ -193,9 +285,9 @@ public class CPSEditor : Editor
     {
         if(TitleStyle == null)
         {
-            TitleStyle = new GUIStyle(EditorStyles.boldLabel);
+            TitleStyle           = new GUIStyle(EditorStyles.boldLabel);
             TitleStyle.alignment = TextAnchor.MiddleCenter;
-            TitleStyle.fontSize = 18;
+            TitleStyle.fontSize  = 18;
         }
 
         return TitleStyle;
@@ -205,10 +297,10 @@ public class CPSEditor : Editor
     {
         if(SubMenuStyle == null)
         {
-            SubMenuStyle = new GUIStyle(EditorStyles.helpBox);
-            SubMenuStyle.margin = new RectOffset(0, 0, 0, 0);
-            SubMenuStyle.padding = new RectOffset(0, 0, 0, 0);
-            SubMenuStyle.border = new RectOffset(0, 0, 0, 0);
+            SubMenuStyle            = new GUIStyle(EditorStyles.helpBox);
+            SubMenuStyle.margin     = new RectOffset(0, 0, 0, 0);
+            SubMenuStyle.padding    = new RectOffset(0, 0, 0, 0);
+            SubMenuStyle.border     = new RectOffset(0, 0, 0, 0);
         }
         if(bgColor != null) SubMenuStyle.normal.background = MakeTex(1, 1, bgColor);
 
@@ -228,6 +320,21 @@ public class CPSEditor : Editor
         return result;
     }
 
+    static void HorizontalSeparator(float spaceInPixels = 5.0f)
+    {
+        GUILayout.Space(spaceInPixels);
+
+        GUIStyle separatorStyle = new GUIStyle(GUI.skin.box);
+        separatorStyle.margin = new RectOffset(0, 0, 4, 4);
+        separatorStyle.fixedHeight = 2f;
+        separatorStyle.stretchWidth = true;
+        separatorStyle.normal.background = EditorGUIUtility.whiteTexture;
+
+        GUILayout.Box(GUIContent.none, separatorStyle);
+
+        GUILayout.Space(spaceInPixels);
+    }
+
     static void Indented(Action indentedPart)
     {
         EditorGUI.indentLevel++;
@@ -235,10 +342,15 @@ public class CPSEditor : Editor
         EditorGUI.indentLevel--;
     }
 
+    static bool ChangedPropertyField(SerializedProperty prop, GUIContent content = null, params GUILayoutOption[] options)
+    {
+        EditorGUI.BeginChangeCheck();
+        EditorGUILayout.PropertyField(prop, content ?? GUIContent.none, options);
+        return EditorGUI.EndChangeCheck();
+    }
+
     static void SubMenuContext(Action subMenu, string title, Color bgColor, int space = 15)
     {
-        EditorGUILayout.Space(space);
-
         EditorGUILayout.BeginVertical(GetSubMenuStyle(bgColor));
         {
             EditorGUILayout.LabelField(title, GetTitleStyle());
@@ -247,99 +359,254 @@ public class CPSEditor : Editor
         EditorGUILayout.EndVertical();
     }
 
-    static void ManipulateScalarGenerator3D(ref CPS.ScalarGenerator<Vector3> scalarGen, string msg)
+    static void ManipulateScalarGenerator3D(/*CPS.ScalarGenerator<Vector3>*/ SerializedProperty scalarGen, string msg)
     {
-        scalarGen.Type = (CPS.ScalarGeneratorType)EditorGUILayout.EnumPopup($"{msg}: ", scalarGen.Type);
-        EditorGUI.indentLevel++;
-            switch(scalarGen.Type) 
+        var type            = scalarGen.FindPropertyRelativeOrFail("Type");
+        var exactScalar     = scalarGen.FindPropertyRelativeOrFail("ExactScalar");
+        var uniform         = scalarGen.FindPropertyRelativeOrFail("Uniform");
+        var bottomScalar    = scalarGen.FindPropertyRelativeOrFail("BottomScalar");
+        var topScalar       = scalarGen.FindPropertyRelativeOrFail("TopScalar");
+
+
+        GUIContent typeLabel    = new GUIContent{ text = $"{msg} Type"   };
+        GUIContent exactLabel   = new GUIContent{ text = $"Exact {msg}"  };
+        GUIContent bottomLabel  = new GUIContent{ text = $"Bottom {msg}" };
+        GUIContent topLabel     = new GUIContent{ text = $"Top {msg}"    };
+        GUIContent uniformLabel = new GUIContent{ text = $"Uniform"      };
+
+
+        EditorGUILayout.PropertyField(type, typeLabel);
+        Indented(() =>
+        {
+            switch((CPS.ScalarGeneratorType)type.enumValueIndex)
             {
                 case CPS.ScalarGeneratorType.Exact:
                 {
-                    scalarGen.ExactScalar = EditorGUILayout.Vector3Field($"Exact {msg}: ", scalarGen.ExactScalar);
+                    EditorGUILayout.PropertyField(uniform);
+                    EditorGUILayout.PropertyField(exactScalar, exactLabel);
+
+                    if(uniform.boolValue)
+                    {
+                        var v = exactScalar.vector3Value;
+
+                        if(v.x == v.z)      { v.x = v.y; v.z = v.y; }
+                        else if(v.y == v.z) { v.y = v.x; v.z = v.x; }
+                        else                { v.y = v.z; v.x = v.z; }
+
+                        exactScalar.vector3Value = v;
+                    }
+
                     break;
                 }
                 case CPS.ScalarGeneratorType.Ranged:
+                {
+                    var becameUniform = ChangedPropertyField(uniform, uniformLabel);
+
+                    if(becameUniform || ChangedPropertyField(bottomScalar, bottomLabel))
+                    {
+                        if(uniform.boolValue)
+                        {
+                            var v = bottomScalar.vector3Value;
+
+                            if(v.x == v.z)      { v.x = v.y; v.z = v.y; }
+                            else if(v.y == v.z) { v.y = v.x; v.z = v.x; }
+                            else                { v.y = v.z; v.x = v.z; }
+                            
+                            bottomScalar.vector3Value = v;
+                        }
+
+                        topScalar.vector3Value = new Vector3
+                        (
+                            Mathf.Max(bottomScalar.vector3Value.x, topScalar.vector3Value.x),
+                            Mathf.Max(bottomScalar.vector3Value.y, topScalar.vector3Value.y),
+                            Mathf.Max(bottomScalar.vector3Value.z, topScalar.vector3Value.z)
+                        );
+                    }
+                    if(becameUniform || ChangedPropertyField(topScalar, topLabel))
+                    {
+                        if(uniform.boolValue)
+                        {
+                            var v = topScalar.vector3Value;
+
+                            if(v.x == v.z)      { v.x = v.y; v.z = v.y; }
+                            else if(v.y == v.z) { v.y = v.x; v.z = v.x; }
+                            else                { v.y = v.z; v.x = v.z; }
+
+                            topScalar.vector3Value = v;
+                        }
+
+                        bottomScalar.vector3Value = new Vector3
+                        (
+                            Mathf.Min(bottomScalar.vector3Value.x, topScalar.vector3Value.x),
+                            Mathf.Min(bottomScalar.vector3Value.y, topScalar.vector3Value.y),
+                            Mathf.Min(bottomScalar.vector3Value.z, topScalar.vector3Value.z)
+                        );
+                    }
+                    break;
+                }
                 case CPS.ScalarGeneratorType.Gaussian:
                 {
                     EditorGUILayout.LabelField("Not supported yet!");
                     break;
                 }
             }
-        EditorGUI.indentLevel--;
+        });
     }
 
-    static void ManipulateScalarGenerator1D(ref CPS.ScalarGenerator<float> scalarGen, string msg, bool nonNegative = true)
+    static void ManipulateScalarGenerator1D(/*CPS.ScalarGenerator<float>*/ SerializedProperty scalarGen, string msg, bool nonNegative = true)
     {
-        scalarGen.Type = (CPS.ScalarGeneratorType)EditorGUILayout.EnumPopup($"{msg}: ", scalarGen.Type);
-        EditorGUI.indentLevel++;
-            switch(scalarGen.Type) 
+        var type            = scalarGen.FindPropertyRelativeOrFail("Type");
+        var exactScalar     = scalarGen.FindPropertyRelativeOrFail("ExactScalar");
+        var bottomScalar    = scalarGen.FindPropertyRelativeOrFail("BottomScalar");
+        var topScalar       = scalarGen.FindPropertyRelativeOrFail("TopScalar");
+
+
+        GUIContent typeLabel    = new GUIContent{ text = $"{msg} Type"   };
+        GUIContent exactLabel   = new GUIContent{ text = $"Exact {msg}"  };
+        GUIContent bottomLabel  = new GUIContent{ text = $"Bottom {msg}" };
+        GUIContent topLabel     = new GUIContent{ text = $"Top {msg}"    };
+
+
+        EditorGUILayout.PropertyField(type, typeLabel);
+        Indented(() =>
+        {
+            switch((CPS.ScalarGeneratorType)type.enumValueIndex)
             {
                 case CPS.ScalarGeneratorType.Exact:
                 {
-                    scalarGen.ExactScalar = EditorGUILayout.FloatField($"Exact {msg}: ", scalarGen.ExactScalar);
-                    if(nonNegative) scalarGen.ExactScalar = Mathf.Max(scalarGen.ExactScalar, 0);
+                    EditorGUILayout.PropertyField(exactScalar, exactLabel);
                     break;
                 }
                 case CPS.ScalarGeneratorType.Ranged:
+                {
+                    if(ChangedPropertyField(bottomScalar, bottomLabel))
+                    {
+                        topScalar.floatValue = Mathf.Max(bottomScalar.floatValue, topScalar.floatValue);
+                    }
+                    else if(ChangedPropertyField(topScalar, topLabel))
+                    {
+                        bottomScalar.floatValue = Mathf.Min(bottomScalar.floatValue, topScalar.floatValue);
+                    }
+                    break;
+                }
                 case CPS.ScalarGeneratorType.Gaussian:
                 {
                     EditorGUILayout.LabelField("Not supported yet!");
                     break;
                 }
             }
-        EditorGUI.indentLevel--;
+        });
+
+        if(nonNegative)
+        {
+            exactScalar.floatValue  = Mathf.Max(0, exactScalar.floatValue  );
+            topScalar.floatValue    = Mathf.Max(0, topScalar.floatValue    );
+            bottomScalar.floatValue = Mathf.Max(0, bottomScalar.floatValue );
+        }
     }
 
-    static void ManipulateFunctionGenerator(ref CPS.FunctionGenerator funcGen, string msg)
+    static void ManipulateFunctionGenerator(/*CPS.FunctionGenerator*/ SerializedProperty funcGen, string msg)
     {
-        funcGen.Type = (CPS.FunctionGeneratorType)EditorGUILayout.EnumPopup($"{msg}: ", funcGen.Type);
-        EditorGUI.indentLevel++;
-            switch(funcGen.Type) 
+        var type                = funcGen.FindPropertyRelativeOrFail("Type");
+        var centerOffset        = funcGen.FindPropertyRelativeOrFail("CenterOffset");
+        var radius              = funcGen.FindPropertyRelativeOrFail("Radius");
+
+        GUIContent typeLabel    = new GUIContent{ text = $"{msg} Type"   };
+
+
+        EditorGUILayout.PropertyField(type, typeLabel);
+        Indented(() =>
+        {
+            switch((CPS.FunctionGeneratorType)type.enumValueIndex)
             {
                 case CPS.FunctionGeneratorType.Point:
                 {
-                    funcGen.Identity = EditorGUILayout.Vector3Field($"Exact {msg}: ", funcGen.Identity);
+                    EditorGUILayout.PropertyField(centerOffset);
                     break;
                 }
                 case CPS.FunctionGeneratorType.Sphere:
+                {
+                    EditorGUILayout.PropertyField(centerOffset);
+                    EditorGUILayout.PropertyField(radius);
+                    radius.floatValue = Mathf.Max(0, radius.floatValue);
+                    break;
+                }
                 case CPS.FunctionGeneratorType.Plane:
-                case CPS.FunctionGeneratorType.Cube:
+                case CPS.FunctionGeneratorType.Cuboid:
                 {
                     EditorGUILayout.LabelField("Not supported yet!");
                     break;
                 }
             }
-        EditorGUI.indentLevel--;
+        });
     }
 
 #endregion
 
-    CPS Target
+    // Object
+    SerializedObject    _CPS;
+
+    // Script properties
+    SerializedProperty  _CPSSimulatorTemplate;
+
+    // Setting properties
+    SerializedProperty  _SimulationSpace;
+    SerializedProperty  _RenderType;
+    SerializedProperty  _DrawGUI;
+
+    // Start properties
+    SerializedProperty  _StartVelocityGenerator;
+    SerializedProperty  _StartSizeGenerator;
+    SerializedProperty  _StartRotationGenerator;
+    SerializedProperty  _StartLifetimeGenerator;
+    SerializedProperty  _StartPositionGenerator;
+
+    private void OnEnable()
     {
-        get => target as CPS;
+        // NOTE: Can be automatized with reflection
+
+        _CPS = new SerializedObject(target);
+
+        _CPSSimulatorTemplate   = _CPS.FindProperty("CPSSimulatorTemplate");
+
+        _SimulationSpace        = _CPS.FindProperty("SimulationSpace");
+        _RenderType             = _CPS.FindProperty("RenderType");
+        _DrawGUI                = _CPS.FindProperty("DrawGUI");
+
+        _StartVelocityGenerator = _CPS.FindProperty("StartVelocityGenerator");
+        _StartSizeGenerator     = _CPS.FindProperty("StartSizeGenerator");
+        _StartRotationGenerator = _CPS.FindProperty("StartRotationGenerator");
+        _StartLifetimeGenerator = _CPS.FindProperty("StartLifetimeGenerator");
+        _StartPositionGenerator = _CPS.FindProperty("StartPositionGenerator");
     }
 
     void ScriptSubMenu()
     { 
-        DrawDefaultInspector();
-        Target.CPSSimulatorTemplate = (ComputeShader)EditorGUILayout.ObjectField("CPS Simulation Template: ", Target.CPSSimulatorTemplate as UnityEngine.Object, typeof(ComputeShader), true);
+        EditorGUI.BeginDisabledGroup(true);
+        EditorGUILayout.ObjectField("Script:", MonoScript.FromMonoBehaviour(target as CPS), typeof(CPS), true);
+        EditorGUI.EndDisabledGroup();
+
+        EditorGUILayout.PropertyField(_CPSSimulatorTemplate, true);
     }
 
     void SettingsSubMenu()
     {
-        Target.SimulationSpace  = (CPS.SimulationSpaceType) EditorGUILayout.EnumPopup("Simulation space: ", Target.SimulationSpace);
-        Target.RenderType       = (CPS.CPSRenderType)       EditorGUILayout.EnumPopup("Render type: ", Target.RenderType);
+        EditorGUILayout.PropertyField(_SimulationSpace, true);
+        EditorGUILayout.PropertyField(_RenderType,      true);
+        EditorGUILayout.PropertyField(_DrawGUI,         true);
     }
 
     void StartSubMenu()
     {
-        ManipulateScalarGenerator3D(ref Target.StartVelocityGenerator,  "Start Velocity");
-        ManipulateScalarGenerator3D(ref Target.StartSizeGenerator,      "Start Size");
-        ManipulateScalarGenerator3D(ref Target.StartRotationGenerator,  "Start Rotation");
-
-        ManipulateScalarGenerator1D(ref Target.StartLifetimeGenerator,  "Lifetime");
-
-        ManipulateFunctionGenerator(ref Target.StartPositionGenerator,  "Position");
+        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime"        );
+        HorizontalSeparator();
+        ManipulateFunctionGenerator(_StartPositionGenerator,  "Position"        );
+        HorizontalSeparator();
+        ManipulateScalarGenerator3D(_StartSizeGenerator,      "Start Size"      );
+        HorizontalSeparator();
+        ManipulateScalarGenerator3D(_StartRotationGenerator,  "Start Rotation"  );
+        HorizontalSeparator();
+        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity"  );
     }
 
     void SimulationSubMenu()
@@ -354,11 +621,20 @@ public class CPSEditor : Editor
 
     public override void OnInspectorGUI()
     {
+        _CPS.Update();
+
+
         SubMenuContext(ScriptSubMenu,       "Scripts",      ScriptsColor);
+        EditorGUILayout.Space();
         SubMenuContext(SettingsSubMenu,     "Settings",     SettingsColor);
+        EditorGUILayout.Space();
         SubMenuContext(StartSubMenu,        "Start",        StartColor);   
+        EditorGUILayout.Space();
         SubMenuContext(SimulationSubMenu,   "Simulation",   SimulationColor);   
+        EditorGUILayout.Space();
         SubMenuContext(EndSubMenu,          "End",          EndColor);   
+
+        _CPS.ApplyModifiedProperties();
     }
 }
 

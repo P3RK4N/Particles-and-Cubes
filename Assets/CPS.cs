@@ -8,6 +8,8 @@ using Unity.VisualScripting;
 using UnityEditor.UIElements;
 using static UnityEngine.GraphicsBuffer;
 using Unity.Mathematics;
+using UnityEngine.UIElements;
+
 
 
 #if UNITY_EDITOR
@@ -299,7 +301,10 @@ public class CPS : MonoBehaviour
             UpdateObjectPoints();
         }
 
-        renderParams.matProps.SetMatrix("ObjectToWorld", tf.localToWorldMatrix);
+        // TODO: Potentially include rotation later
+        Matrix4x4 localToWorldMatrix = Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale);
+        renderParams.matProps.SetMatrix("ObjectToWorld", localToWorldMatrix);
+
         Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, commandBuffer);
     }
 
@@ -314,6 +319,8 @@ public class CPS : MonoBehaviour
             rot * (  Vector3.right - Vector3.up),
             rot * (  Vector3.right + Vector3.up)
         };
+
+        for(int i = 0; i < 4; i++) objectPoints[i].w = 1.0f;
 
         renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }

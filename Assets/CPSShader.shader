@@ -30,14 +30,13 @@ Shader "Unlit/ParticleShader"
 
             struct GEOM_IN
             {
-                float3 OffsetWS   : TEXCOORD0;
-                uint ID           : TEXCOORD1;
+                uint ID           : TEXCOORD0;
             };
 
             struct FRAG_IN
             {
                 float4 PositionCS   : SV_POSITION;
-                float2 UV           : TEXCOORD2;
+                float2 UV           : TEXCOORD1;
             };
 
             sampler2D _MainTex;
@@ -55,11 +54,7 @@ Shader "Unlit/ParticleShader"
             {
                 InitIndirectDrawArgs(0); 
                 GEOM_IN OUT = (GEOM_IN)0;
-                uint id = GetIndirectVertexID(VertexID);
-
-                OUT.ID = id;
-                OUT.OffsetWS = SimulationStateBuffer[id].OffsetWS;
-
+                OUT.ID = GetIndirectVertexID(VertexID);
                 return OUT;
             }
 
@@ -68,10 +63,15 @@ Shader "Unlit/ParticleShader"
             {
                 FRAG_IN OUT = (FRAG_IN)0;
 
+                uint id = input[0].ID;
+                float4 offsetWS = float4(SimulationStateBuffer[id].OffsetWS, 1);
+                float4 scale    = float4(SimulationStateBuffer[id].Scale, 1);
+
                 [unroll]
                 for(int i = 0; i < 4; i++)
                 {
-                    OUT.PositionCS = UnityWorldToClipPos(mul(ObjectToWorld,ObjectPoints[i]) + input[0].OffsetWS);
+                    float4 posWS = mul(ObjectToWorld, ObjectPoints[i] * scale);
+                    OUT.PositionCS = UnityWorldToClipPos(posWS + offsetWS);
                     output.Append(OUT);
                 }
                 

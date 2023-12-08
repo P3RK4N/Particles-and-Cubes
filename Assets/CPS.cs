@@ -7,12 +7,7 @@ using System;
 using Unity.VisualScripting;
 using UnityEditor.UIElements;
 using static UnityEngine.GraphicsBuffer;
-using UnityEngine.Rendering;
-using Unity.Collections;
-
-
-
-
+using Unity.Mathematics;
 
 
 #if UNITY_EDITOR
@@ -59,6 +54,11 @@ public class CPS : MonoBehaviour
         Point,
         Billboard,
         Mesh
+    }
+
+    public enum SimulatorKernelType
+    {
+        Mock = 0
     }
 
 #endregion
@@ -185,11 +185,27 @@ public class CPS : MonoBehaviour
 #endregion
 
     public static CPS Singleton;
+    public static readonly int HARD_LIMIT = 32 * 32 * 32 * 32 - 1;
 
     /// <summary>
     /// CPSSimulator instance
     /// </summary>
     ComputeShader Simulator;
+
+    /// <summary>
+    /// Rendering context
+    /// </summary>
+    RenderParams renderParams;
+
+    /// <summary>
+    /// Defines number of vertices and instances per graphics buffer 
+    /// </summary>
+    GraphicsBuffer commandBuffer;
+
+    /// <summary>
+    /// Number at which compute shader will work
+    /// </summary>
+    int dispatchNum = 0;
 
     /// <summary>
     /// Buffer containing simulation state
@@ -200,22 +216,18 @@ public class CPS : MonoBehaviour
     ///     float: PosY
     ///     float: PosZ
     ///     
-    ComputeBuffer SimulationStateBuffer;
+    GraphicsBuffer SimulationStateBuffer;
 
     /// <summary>
     /// Buffer containing mostly readonly data
     /// </summary>
     /// Structure:
     /// 
-    ///     vec3: CameraX
-    ///     vec3: CameraY
-    ///     
-    ComputeBuffer GlobalStateBuffer;
+    GraphicsBuffer GlobalStateBuffer;
 
     Transform           tf;
-    Mesh                mesh;
-    MeshFilter          filter;
-    Material            material;  
+    Material            material;
+    Material            sharedMaterial;
     new MeshRenderer    renderer;
 
     void Awake()
@@ -224,20 +236,59 @@ public class CPS : MonoBehaviour
 
         Debug.Assert(SimulatorTemplate != null, "SimulatorTemplate should not be null!");
 
-        tf = transform;
-        mesh = CreateMesh();
-        filter = GetComponent<MeshFilter>();
-        filter.mesh = mesh;
-        renderer = GetComponent<MeshRenderer>();
-        material = renderer.sharedMaterial; // TODO: Change in playmode
+        tf              = transform;
+        renderer        = GetComponent<MeshRenderer>();
+        material        = renderer.material;
+        sharedMaterial  = renderer.sharedMaterial;
 
-        Simulator = Instantiate(SimulatorTemplate);
-
+        FindDispatchNum();
         CreateBuffers();
+        InitializeCompute();
+        InitializeRenderContext();
+    }
+
+    void Start()
+    {
+        Simulator.Dispatch((int)SimulatorKernelType.Mock, dispatchNum, dispatchNum, 1);    
+    }
+
+    void InitializeCompute()
+    {
+        Simulator = Instantiate(SimulatorTemplate);
+        
+        Simulator.SetInt("DISPATCH_NUM", dispatchNum);
+        Simulator.SetInt("COUNT_PER_DIMENSION", 2*dispatchNum);
+
+        foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
+        {
+            Simulator.SetBuffer((int)kernel, "SimulationStateBuffer", SimulationStateBuffer);
+        }
+    }
+
+    void FindDispatchNum()
+    {
+        for(int i = 2; i <= 32; i*=2)
+        {
+            if(MaximumParticleCount <= i*i*i*i)
+            {
+                dispatchNum = i;
+                Debug.Log($"Dispatch count: {i*i*i*i}");
+                return;
+            }
+        }
+    }
+
+    void InitializeRenderContext()
+    {
+        renderParams             = new RenderParams(sharedMaterial); // Consider sharedMat or mat
+        renderParams.worldBounds = new Bounds(Vector3.zero, 10000*Vector3.one);
+        renderParams.matProps    = new MaterialPropertyBlock();
+        renderParams.matProps.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
     }
 
     void OnDestroy()
     {
+        if(this == Singleton) Singleton = null;
         DeleteBuffers();
     }
     
@@ -245,13 +296,26 @@ public class CPS : MonoBehaviour
     {
         if(this == Singleton)
         {
-            material.SetVector("CameraX", Camera.main.transform.right);
-            material.SetVector("CameraY", Camera.main.transform.up);
+            UpdateObjectPoints();
         }
+
+        renderParams.matProps.SetMatrix("ObjectToWorld", tf.localToWorldMatrix);
+        Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, commandBuffer);
     }
 
-    void OnPostRender()
+    private void UpdateObjectPoints()
     {
+        var rot = Matrix4x4.Rotate(Camera.main.transform.rotation);
+        
+        Vector4[] objectPoints = new Vector4[]
+        {
+            rot * (- Vector3.right - Vector3.up),
+            rot * (- Vector3.right + Vector3.up),
+            rot * (  Vector3.right - Vector3.up),
+            rot * (  Vector3.right + Vector3.up)
+        };
+
+        renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }
 
     void OnDrawGizmos()
@@ -263,38 +327,24 @@ public class CPS : MonoBehaviour
 
     void CreateBuffers()
     {
-        //Debug.Assert(MaximumParticleCount > 1, "Mock position error!");
-
-        NativeArray<Vector3> MockPositions = new NativeArray<Vector3>(MaximumParticleCount, Allocator.Temp);
-        MockPositions[0] = new Vector3(0, 0, 0);
-        //MockPositions[1] = new Vector3(1, 1, 1);
-
-        SimulationStateBuffer = new ComputeBuffer(MaximumParticleCount, 3 /*Floats*/ * 4 /*Bytes*/, ComputeBufferType.Structured, ComputeBufferMode.Dynamic);
-        SimulationStateBuffer.SetData(MockPositions);
+        SimulationStateBuffer = new GraphicsBuffer(Target.Structured, MaximumParticleCount, 6 /*Floats*/ * 4 /*Bytes*/);
         material.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
 
-        GlobalStateBuffer = new ComputeBuffer(1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/, ComputeBufferType.Constant);
+        GlobalStateBuffer = new GraphicsBuffer(Target.Structured, 1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/);
         material.SetBuffer("GlobaStateBuffer", GlobalStateBuffer);
+
+        var args = new IndirectDrawArgs[1];
+        commandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
+        args[0].vertexCountPerInstance = (uint)MaximumParticleCount;
+        args[0].instanceCount = 1;
+        commandBuffer.SetData(args);
     }
 
     void DeleteBuffers()
     {
         SimulationStateBuffer?.Dispose();
         GlobalStateBuffer?.Dispose();
-    }
-
-    Mesh CreateMesh()
-    {
-        Mesh m = new Mesh();
-
-        NativeArray<Vector3>    vertices = new NativeArray<Vector3> (1,                    Allocator.Temp);
-        NativeArray<uint>       indices  = new NativeArray<uint>    (MaximumParticleCount, Allocator.Temp);
-
-        m.SetVertices(vertices);
-        m.SetIndices(indices, MeshTopology.Points, 0);
-        m.bounds = new Bounds(Vector3.zero, new Vector3(5, 5, 5)); // TODO: Make dependent on maximum Geometry Shader output size?
-
-        return m;
+        commandBuffer?.Dispose();
     }
 
     private void DrawStartPosition()
@@ -725,6 +775,7 @@ public class CPSEditor : Editor
     void SimulationSubMenu()
     {
         DisabledPropertyField(Application.isPlaying, _MaximumParticleCount);
+        _MaximumParticleCount.intValue = Mathf.Min(_MaximumParticleCount.intValue, CPS.HARD_LIMIT);
         DisabledPropertyField(true, _CurrentParticleCount);
 
         //HorizontalSeparator();

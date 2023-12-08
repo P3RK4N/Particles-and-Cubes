@@ -1,14 +1,21 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel Mock
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
-
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+struct SimulationState
 {
-    // TODO: insert actual code here!
+    float3 Position;
+    float3 Scale;
+};
 
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+RWStructuredBuffer<SimulationState> SimulationStateBuffer;
+
+uniform int DISPATCH_NUM;
+uniform int COUNT_PER_DIMENSION;
+
+[numthreads(2,2,1)]
+void Mock (uint3 id : SV_DispatchThreadID)
+{
+    uint ID = id.x + id.y * COUNT_PER_DIMENSION;
+    SimulationStateBuffer[ID].Position = ID;
+    SimulationStateBuffer[ID].Scale    = ID;
 }

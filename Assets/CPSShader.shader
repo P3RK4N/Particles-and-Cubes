@@ -6,53 +6,90 @@ Shader "Unlit/ParticleShader"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
-        LOD 100
+        Tags { "RenderType"="Opaque" "Queue"="Geometry" "RenderPipeline"="UniversalPipeline" }
 
         Pass
         {
-            CGPROGRAM
+            HLSLPROGRAM
+
+            #pragma target 5.0
+
             #pragma vertex vert
+            #pragma geometry geom
             #pragma fragment frag
-            // make fog work
-            #pragma multi_compile_fog
 
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct appdata
+            struct SimulationState
             {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
+                float3 Position;
             };
 
-            struct v2f
+            struct GlobalState
             {
-                float2 uv : TEXCOORD0;
-                UNITY_FOG_COORDS(1)
-                float4 vertex : SV_POSITION;
+                float3 padding;
+            };
+
+            struct VERT_IN
+            {
+                float4 PositionOS   : POSITION;
+                uint   ID           : SV_VERTEXID;
+            };
+
+            struct GEOM_IN
+            {
+                float4 PositionWS   : POSITION;
+            };
+
+            struct FRAG_IN
+            {
+                float4 PositionCS   : SV_POSITION;
+                float2 UV           : TEXCOORD0;
             };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-            v2f vert (appdata v)
+            float3 CameraX;
+            float3 CameraY;
+
+            RWStructuredBuffer<SimulationState> SimulationStateBuffer;
+            RWStructuredBuffer<GlobalState>     GlobalStateBuffer;
+
+            CBUFFER_START(UnityPerMaterial)
+            CBUFFER_END
+
+            GEOM_IN vert (VERT_IN IN)
             {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                UNITY_TRANSFER_FOG(o,o.vertex);
-                return o;
+                GEOM_IN OUT = (GEOM_IN)0;
+                OUT.PositionWS = float4(TransformObjectToWorld(IN.PositionOS.xyz) + SimulationStateBuffer[IN.ID].Position, 0);
+                return OUT;
             }
 
-            fixed4 frag (v2f i) : SV_Target
+            [maxvertexcount(4)]
+            void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
             {
-                // sample the texture
-                fixed4 col = tex2D(_MainTex, i.uv);
-                // apply fog
-                UNITY_APPLY_FOG(i.fogCoord, col);
-                return col;
+                FRAG_IN OUT = (FRAG_IN)0;
+
+                OUT.PositionCS = TransformWorldToHClip(input[0].PositionWS - CameraX - CameraY);
+                output.Append(OUT);
+                OUT.PositionCS = TransformWorldToHClip(input[0].PositionWS - CameraX + CameraY);
+                output.Append(OUT);
+                OUT.PositionCS = TransformWorldToHClip(input[0].PositionWS + CameraX - CameraY);
+                output.Append(OUT);
+                OUT.PositionCS = TransformWorldToHClip(input[0].PositionWS + CameraX + CameraY);
+                output.Append(OUT);
+
+                output.RestartStrip();
             }
-            ENDCG
+
+            half4 frag (FRAG_IN i) : SV_Target
+            {
+                // fixed4 col = tex2D(_MainTex, i.uv);
+                return half4(1,1,1,1);
+            }
+            
+            ENDHLSL
         }
     }
 }

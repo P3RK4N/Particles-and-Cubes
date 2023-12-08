@@ -7,6 +7,10 @@ using System;
 using Unity.VisualScripting;
 using UnityEditor.UIElements;
 using static UnityEngine.GraphicsBuffer;
+using UnityEngine.Rendering;
+using Unity.Collections;
+
+
 
 
 
@@ -50,7 +54,7 @@ public class CPS : MonoBehaviour
         Global
     }
 
-    public enum CPSRenderType
+    public enum ParticleRenderType
     {
         Point,
         Billboard,
@@ -117,7 +121,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Template of shader which will simulate particles
     /// </summary>
-    [SerializeField] public ComputeShader CPSSimulatorTemplate;
+    [SerializeField] public ComputeShader SimulatorTemplate;
 #endregion
 
 #region Setting Fields
@@ -130,7 +134,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Type of rendering
     /// </summary>
-    [SerializeField] public CPSRenderType               RenderType;
+    [SerializeField] public ParticleRenderType          RenderType;
 
     /// <summary>
     /// Whether to draw helper gui
@@ -170,8 +174,8 @@ public class CPS : MonoBehaviour
 
 #region SimulationFields
 
-    [SerializeField] public ulong MaximumParticleCount;
-    [SerializeField] public ulong CurrentParticleCount = 0;
+    [SerializeField] public int MaximumParticleCount;
+    [SerializeField] public int CurrentParticleCount = 0;
 
     /// <summary>
     /// Environmental ForceField stuff (walls, attractors, repulsors)
@@ -180,22 +184,70 @@ public class CPS : MonoBehaviour
 
 #endregion
 
+    public static CPS Singleton;
+
     /// <summary>
     /// CPSSimulator instance
     /// </summary>
-    ComputeShader CPSSimulator;
+    ComputeShader Simulator;
 
     /// <summary>
     /// Buffer containing simulation state
     /// </summary>
-    ComputeBuffer CPSSimulationBuffer;
+    /// Structure:
+    /// 
+    ///     float: PosX
+    ///     float: PosY
+    ///     float: PosZ
+    ///     
+    ComputeBuffer SimulationStateBuffer;
+
+    /// <summary>
+    /// Buffer containing mostly readonly data
+    /// </summary>
+    /// Structure:
+    /// 
+    ///     vec3: CameraX
+    ///     vec3: CameraY
+    ///     
+    ComputeBuffer GlobalStateBuffer;
+
+    Transform           tf;
+    Mesh                mesh;
+    MeshFilter          filter;
+    Material            material;  
+    new MeshRenderer    renderer;
 
     void Awake()
     {
-        Debug.Assert(CPSSimulatorTemplate != null, "CPSSimulatorTemplate should not be null!");
+        if(Singleton == null) Singleton = this;
 
-        CPSSimulator = Instantiate(CPSSimulatorTemplate);
-        //CPSSimulationBuffer = new ComputeBuffer();
+        Debug.Assert(SimulatorTemplate != null, "SimulatorTemplate should not be null!");
+
+        tf = transform;
+        mesh = CreateMesh();
+        filter = GetComponent<MeshFilter>();
+        filter.mesh = mesh;
+        renderer = GetComponent<MeshRenderer>();
+        material = renderer.sharedMaterial; // TODO: Change in playmode
+
+        Simulator = Instantiate(SimulatorTemplate);
+
+        CreateBuffers();
+    }
+
+    void OnDestroy()
+    {
+        DeleteBuffers();
+    }
+    
+    void Update()
+    {
+        if(this == Singleton)
+        {
+            material.SetVector("CameraX", Camera.main.transform.right);
+            material.SetVector("CameraY", Camera.main.transform.up);
+        }
     }
 
     void OnPostRender()
@@ -207,6 +259,42 @@ public class CPS : MonoBehaviour
         if(!DrawGUI) return;
 
         DrawStartPosition();
+    }
+
+    void CreateBuffers()
+    {
+        //Debug.Assert(MaximumParticleCount > 1, "Mock position error!");
+
+        NativeArray<Vector3> MockPositions = new NativeArray<Vector3>(MaximumParticleCount, Allocator.Temp);
+        MockPositions[0] = new Vector3(0, 0, 0);
+        //MockPositions[1] = new Vector3(1, 1, 1);
+
+        SimulationStateBuffer = new ComputeBuffer(MaximumParticleCount, 3 /*Floats*/ * 4 /*Bytes*/, ComputeBufferType.Structured, ComputeBufferMode.Dynamic);
+        SimulationStateBuffer.SetData(MockPositions);
+        material.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
+
+        GlobalStateBuffer = new ComputeBuffer(1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/, ComputeBufferType.Constant);
+        material.SetBuffer("GlobaStateBuffer", GlobalStateBuffer);
+    }
+
+    void DeleteBuffers()
+    {
+        SimulationStateBuffer?.Dispose();
+        GlobalStateBuffer?.Dispose();
+    }
+
+    Mesh CreateMesh()
+    {
+        Mesh m = new Mesh();
+
+        NativeArray<Vector3>    vertices = new NativeArray<Vector3> (1,                    Allocator.Temp);
+        NativeArray<uint>       indices  = new NativeArray<uint>    (MaximumParticleCount, Allocator.Temp);
+
+        m.SetVertices(vertices);
+        m.SetIndices(indices, MeshTopology.Points, 0);
+        m.bounds = new Bounds(Vector3.zero, new Vector3(5, 5, 5)); // TODO: Make dependent on maximum Geometry Shader output size?
+
+        return m;
     }
 
     private void DrawStartPosition()
@@ -342,11 +430,27 @@ public class CPSEditor : Editor
         EditorGUI.indentLevel--;
     }
 
+    static void Disabled(bool disabled, Action disabledPart)
+    {
+        EditorGUI.BeginDisabledGroup(disabled);
+            disabledPart();
+        EditorGUI.EndDisabledGroup();
+    }
+
     static bool ChangedPropertyField(SerializedProperty prop, GUIContent content = null, params GUILayoutOption[] options)
     {
         EditorGUI.BeginChangeCheck();
-        EditorGUILayout.PropertyField(prop, content ?? GUIContent.none, options);
+        if(content != null) EditorGUILayout.PropertyField(prop, content, options);
+        else                EditorGUILayout.PropertyField(prop, options);
         return EditorGUI.EndChangeCheck();
+    }
+
+    static void DisabledPropertyField(bool disabled, SerializedProperty prop, GUIContent content = null, params GUILayoutOption[] options)
+    {
+        EditorGUI.BeginDisabledGroup(disabled);
+        if(content != null) EditorGUILayout.PropertyField(prop, content, options);
+        else                EditorGUILayout.PropertyField(prop, options);
+        EditorGUI.EndDisabledGroup();
     }
 
     static void SubMenuContext(Action subMenu, string title, Color bgColor, int space = 15)
@@ -547,7 +651,7 @@ public class CPSEditor : Editor
     SerializedObject    _CPS;
 
     // Script properties
-    SerializedProperty  _CPSSimulatorTemplate;
+    SerializedProperty  _SimulatorTemplate;
 
     // Setting properties
     SerializedProperty  _SimulationSpace;
@@ -561,13 +665,17 @@ public class CPSEditor : Editor
     SerializedProperty  _StartLifetimeGenerator;
     SerializedProperty  _StartPositionGenerator;
 
+    // Simulation properties
+    SerializedProperty _MaximumParticleCount;
+    SerializedProperty _CurrentParticleCount;
+
     private void OnEnable()
     {
         // NOTE: Can be automatized with reflection
 
         _CPS = new SerializedObject(target);
 
-        _CPSSimulatorTemplate   = _CPS.FindProperty("CPSSimulatorTemplate");
+        _SimulatorTemplate      = _CPS.FindProperty("SimulatorTemplate");
 
         _SimulationSpace        = _CPS.FindProperty("SimulationSpace");
         _RenderType             = _CPS.FindProperty("RenderType");
@@ -578,7 +686,12 @@ public class CPSEditor : Editor
         _StartRotationGenerator = _CPS.FindProperty("StartRotationGenerator");
         _StartLifetimeGenerator = _CPS.FindProperty("StartLifetimeGenerator");
         _StartPositionGenerator = _CPS.FindProperty("StartPositionGenerator");
+
+        _MaximumParticleCount   = _CPS.FindProperty("MaximumParticleCount");
+        _CurrentParticleCount   = _CPS.FindProperty("CurrentParticleCount");
     }
+
+    CPS Target { get => target as CPS; }
 
     void ScriptSubMenu()
     { 
@@ -586,7 +699,7 @@ public class CPSEditor : Editor
         EditorGUILayout.ObjectField("Script:", MonoScript.FromMonoBehaviour(target as CPS), typeof(CPS), true);
         EditorGUI.EndDisabledGroup();
 
-        EditorGUILayout.PropertyField(_CPSSimulatorTemplate, true);
+        EditorGUILayout.PropertyField(_SimulatorTemplate, true);
     }
 
     void SettingsSubMenu()
@@ -604,14 +717,17 @@ public class CPSEditor : Editor
         HorizontalSeparator();
         ManipulateScalarGenerator3D(_StartSizeGenerator,      "Start Size"      );
         HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartRotationGenerator,  "Start Rotation"  );
+        Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"));
         HorizontalSeparator();
         ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity"  );
     }
 
     void SimulationSubMenu()
     {
+        DisabledPropertyField(Application.isPlaying, _MaximumParticleCount);
+        DisabledPropertyField(true, _CurrentParticleCount);
 
+        //HorizontalSeparator();
     }
 
     void EndSubMenu()

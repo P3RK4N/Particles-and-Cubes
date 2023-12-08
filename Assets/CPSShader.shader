@@ -2,11 +2,13 @@ Shader "Unlit/ParticleShader"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
+        _MainTex("Texture", 2D) = "white" {}
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" "Queue"="Geometry" "RenderPipeline"="UniversalPipeline" }
+        Tags { "RenderType"="Transparent" "Queue"="Transparent" "RenderPipeline"="UniversalPipeline" }
+        Blend SrcAlpha OneMinusSrcAlpha
+        ZWrite On
 
         Pass
         {
@@ -26,6 +28,9 @@ Shader "Unlit/ParticleShader"
             {
                 float3 OffsetWS;
                 float3 Scale;
+                float3 Velocity;
+                float3 Colour;
+                float2 Current_Max_life;
             };
 
             struct GEOM_IN
@@ -36,6 +41,7 @@ Shader "Unlit/ParticleShader"
             struct FRAG_IN
             {
                 float4 PositionCS   : SV_POSITION;
+                half4  Colour       : COLOR;
                 float2 UV           : TEXCOORD1;
             };
 
@@ -47,7 +53,8 @@ Shader "Unlit/ParticleShader"
             CBUFFER_START(UnityPerMaterial)
                 float4      ObjectPoints[4];
                 float4x4    ObjectToWorld;
-                float4      GlobalColor;
+                float       DeltaTime;
+                float       Time;
             CBUFFER_END
 
             GEOM_IN vert (uint VertexID : SV_VertexID)
@@ -58,30 +65,43 @@ Shader "Unlit/ParticleShader"
                 return OUT;
             }
 
+            static float2 UVs[4] =
+            {
+                float2(0, 0),
+                float2(0, 1),
+                float2(1, 0),
+                float2(1, 1)
+            };
+
             [maxvertexcount(4)]
             void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
             {
                 FRAG_IN OUT = (FRAG_IN)0;
 
                 uint id = input[0].ID;
+                if(SimulationStateBuffer[id].Current_Max_life.x <= 0) { return; }
+
                 float4 offsetWS = float4(SimulationStateBuffer[id].OffsetWS, 1);
-                float4 scale    = float4(SimulationStateBuffer[id].Scale, 1);
+                float4 scale    = float4(SimulationStateBuffer[id].Scale,    1);
+                OUT.Colour      = half4(SimulationStateBuffer[id].Colour,    1);
 
                 [unroll]
                 for(int i = 0; i < 4; i++)
                 {
                     float4 posWS = mul(ObjectToWorld, ObjectPoints[i] * scale);
                     OUT.PositionCS = UnityWorldToClipPos(posWS + offsetWS);
+                    OUT.UV = UVs[i];
                     output.Append(OUT);
                 }
                 
                 output.RestartStrip();
             }
 
-            half4 frag (FRAG_IN i) : SV_Target
+            half4 frag (FRAG_IN IN) : SV_Target
             {
-                // fixed4 col = tex2D(_MainTex, i.uv);
-                return float4(1,1,1,1);
+                half4 texCol = tex2D(_MainTex, IN.UV);
+                if(texCol.a < 0.3) discard;
+                return IN.Colour * texCol;
             }
             
             ENDCG

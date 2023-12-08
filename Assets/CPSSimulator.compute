@@ -1,10 +1,14 @@
 // Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel Mock
+#pragma kernel MockInit
+#pragma kernel MockTick
 
 struct SimulationState
 {
     float3 Position;
     float3 Scale;
+    float3 Velocity;
+    float3 Colour;
+    float2 Current_Max_Life;
 };
 
 RWStructuredBuffer<SimulationState> SimulationStateBuffer;
@@ -12,10 +16,54 @@ RWStructuredBuffer<SimulationState> SimulationStateBuffer;
 uniform int DISPATCH_NUM;
 uniform int COUNT_PER_DIMENSION;
 
+uniform float DeltaTime;
+uniform float Time;
+
+float Hash(float3 p)
+{
+    float h = dot(p, float3(127.1, 311.7, 74.7));
+    return frac(sin(h) * 43758.5453123);
+}
+
+float3 GradientNoise(float3 p, float time)
+{
+    p += float3(time, time * 0.5, time * 0.2);
+
+    float3 i = floor(p);
+    float3 f = frac(p);
+
+    // Smooth interpolation function (e.g., cubic)
+    float3 u = f * f * (3.0 - 2.0 * f);
+
+    return lerp(
+        lerp(
+            lerp(Hash(i + float3(0, 0, 0)), Hash(i + float3(1, 0, 0)), u.x),
+            lerp(Hash(i + float3(0, 1, 0)), Hash(i + float3(1, 1, 0)), u.x),
+            u.y),
+        lerp(
+            lerp(Hash(i + float3(0, 0, 1)), Hash(i + float3(1, 0, 1)), u.x),
+            lerp(Hash(i + float3(0, 1, 1)), Hash(i + float3(1, 1, 1)), u.x),
+            u.y),
+        u.z
+    );
+}
+
 [numthreads(2,2,1)]
-void Mock (uint3 id : SV_DispatchThreadID)
+void MockInit(uint3 id : SV_DispatchThreadID)
 {
     uint ID = id.x + id.y * COUNT_PER_DIMENSION;
-    SimulationStateBuffer[ID].Position = ID;
-    SimulationStateBuffer[ID].Scale    = ID;
+    SimulationStateBuffer[ID].Position          = ID;
+    SimulationStateBuffer[ID].Scale             = ID;
+    SimulationStateBuffer[ID].Velocity          = ID / 100.0;
+    SimulationStateBuffer[ID].Colour            = GradientNoise(ID, Time);
+    SimulationStateBuffer[ID].Current_Max_Life  = ID;
+}
+
+[numthreads(2, 2, 1)]
+void MockTick(uint3 id : SV_DispatchThreadID)
+{
+    uint ID = id.x + id.y * COUNT_PER_DIMENSION;
+
+    SimulationStateBuffer[ID].Current_Max_Life.x -= DeltaTime;
+    SimulationStateBuffer[ID].Position += SimulationStateBuffer[ID].Velocity;
 }

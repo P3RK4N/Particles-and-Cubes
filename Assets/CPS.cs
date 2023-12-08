@@ -60,7 +60,8 @@ public class CPS : MonoBehaviour
 
     public enum SimulatorKernelType
     {
-        Mock = 0
+        MockInit = 0,
+        MockTick
     }
 
 #endregion
@@ -160,7 +161,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Initial size stuff
     /// </summary>
-    [SerializeField] public ScalarGenerator<Vector3>    StartSizeGenerator;
+    [SerializeField] public ScalarGenerator<Vector3>    StartScaleGenerator;
 
     /// <summary>
     /// Initial rotation stuff
@@ -183,6 +184,12 @@ public class CPS : MonoBehaviour
     /// Environmental ForceField stuff (walls, attractors, repulsors)
     /// </summary>
     [SerializeField] public List<ForceFieldDescriptor> ForceFields;
+
+    #endregion
+
+#region Other
+
+    [SerializeField] public Texture2D                   MainTexture;
 
 #endregion
 
@@ -251,7 +258,7 @@ public class CPS : MonoBehaviour
 
     void Start()
     {
-        Simulator.Dispatch((int)SimulatorKernelType.Mock, dispatchNum, dispatchNum, 1);    
+        Simulator.Dispatch((int)SimulatorKernelType.MockInit, dispatchNum, dispatchNum, 1);    
     }
 
     void InitializeCompute()
@@ -286,6 +293,7 @@ public class CPS : MonoBehaviour
         renderParams.worldBounds = new Bounds(Vector3.zero, 10000*Vector3.one);
         renderParams.matProps    = new MaterialPropertyBlock();
         renderParams.matProps.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
+        renderParams.matProps.SetTexture("_MainTex", MainTexture);
     }
 
     void OnDestroy()
@@ -298,13 +306,20 @@ public class CPS : MonoBehaviour
     {
         if(this == Singleton)
         {
+            // TODO: Consider unique prefix for global vars
+            Shader.SetGlobalFloat("DeltaTime", Time.deltaTime);
+            Shader.SetGlobalFloat("Time", Time.time);
+
             UpdateObjectPoints();
+            //renderParams.matProps.SetFloat("DeltaTime", Time.deltaTime);
+            //Simulator.SetFloat("DeltaTime", Time.deltaTime);
         }
 
         // TODO: Potentially include rotation later
         Matrix4x4 localToWorldMatrix = Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale);
         renderParams.matProps.SetMatrix("ObjectToWorld", localToWorldMatrix);
 
+        Simulator.Dispatch((int)SimulatorKernelType.MockTick, dispatchNum, dispatchNum, 1);
         Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, commandBuffer);
     }
 
@@ -322,7 +337,8 @@ public class CPS : MonoBehaviour
 
         for(int i = 0; i < 4; i++) objectPoints[i].w = 1.0f;
 
-        renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
+        Shader.SetGlobalVectorArray("ObjectPoints", objectPoints);
+        //renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }
 
     void OnDrawGizmos()
@@ -334,7 +350,7 @@ public class CPS : MonoBehaviour
 
     void CreateBuffers()
     {
-        SimulationStateBuffer = new GraphicsBuffer(Target.Structured, MaximumParticleCount, 6 /*Floats*/ * 4 /*Bytes*/);
+        SimulationStateBuffer = new GraphicsBuffer(Target.Structured, MaximumParticleCount, (3 + 3 + 3 + 3 + 2) /*Floats*/ * 4 /*Bytes*/);
         material.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
 
         GlobalStateBuffer = new GraphicsBuffer(Target.Structured, 1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/);
@@ -717,7 +733,7 @@ public class CPSEditor : Editor
 
     // Start properties
     SerializedProperty  _StartVelocityGenerator;
-    SerializedProperty  _StartSizeGenerator;
+    SerializedProperty  _StartScaleGenerator;
     SerializedProperty  _StartRotationGenerator;
     SerializedProperty  _StartLifetimeGenerator;
     SerializedProperty  _StartPositionGenerator;
@@ -725,6 +741,9 @@ public class CPSEditor : Editor
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
     SerializedProperty _CurrentParticleCount;
+
+    // Other
+    SerializedProperty _MainTexture;
 
     private void OnEnable()
     {
@@ -739,13 +758,15 @@ public class CPSEditor : Editor
         _DrawGUI                = _CPS.FindProperty("DrawGUI");
 
         _StartVelocityGenerator = _CPS.FindProperty("StartVelocityGenerator");
-        _StartSizeGenerator     = _CPS.FindProperty("StartSizeGenerator");
+        _StartScaleGenerator    = _CPS.FindProperty("StartScaleGenerator");
         _StartRotationGenerator = _CPS.FindProperty("StartRotationGenerator");
         _StartLifetimeGenerator = _CPS.FindProperty("StartLifetimeGenerator");
         _StartPositionGenerator = _CPS.FindProperty("StartPositionGenerator");
 
         _MaximumParticleCount   = _CPS.FindProperty("MaximumParticleCount");
         _CurrentParticleCount   = _CPS.FindProperty("CurrentParticleCount");
+
+        _MainTexture            = _CPS.FindProperty("MainTexture");
     }
 
     CPS Target { get => target as CPS; }
@@ -772,7 +793,7 @@ public class CPSEditor : Editor
         HorizontalSeparator();
         ManipulateFunctionGenerator(_StartPositionGenerator,  "Position"        );
         HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartSizeGenerator,      "Start Size"      );
+        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale"     );
         HorizontalSeparator();
         Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"));
         HorizontalSeparator();
@@ -807,6 +828,8 @@ public class CPSEditor : Editor
         SubMenuContext(SimulationSubMenu,   "Simulation",   SimulationColor);   
         EditorGUILayout.Space();
         SubMenuContext(EndSubMenu,          "End",          EndColor);   
+
+        EditorGUILayout.PropertyField(_MainTexture);
 
         _CPS.ApplyModifiedProperties();
     }

@@ -29,7 +29,7 @@ Shader "Unlit/ParticleShader"
                 float3 OffsetWS;
                 float3 Scale;
                 float3 Velocity;
-                float3 OuterVelocity;
+                float3 ExternalVelocity;
                 float3 Colour;
                 float2 Current_Max_life;
             };
@@ -101,7 +101,7 @@ Shader "Unlit/ParticleShader"
             half4 frag (FRAG_IN IN) : SV_Target
             {
                 half4 texCol = tex2D(_MainTex, IN.UV);
-                if(texCol.a < 0.3) discard;
+                if(texCol.a < 0.6) discard;
                 return IN.Colour * texCol;
             }
             

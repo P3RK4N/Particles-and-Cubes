@@ -229,6 +229,8 @@ MonoBehaviour:
     Radius: 1.9
   MaximumParticleCount: 10
   CurrentParticleCount: 0
+  EmissionRate: 10
+  EmissionAmount: 0
   UseGravity: 0
   ForceFields: []
   MainTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}
@@ -566,6 +568,8 @@ MonoBehaviour:
     Radius: 1.9
   MaximumParticleCount: 10
   CurrentParticleCount: 0
+  EmissionRate: 8
+  EmissionAmount: 0
   UseGravity: 1
   ForceFields: []
   MainTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}

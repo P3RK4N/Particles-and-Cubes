@@ -58,10 +58,11 @@ public class CPS : MonoBehaviour
         Mesh
     }
 
-    public enum SimulatorKernelType
+    public enum SimulatorKernelType : int
     {
-        MockInit = 0,
-        MockTick
+        MockInit    = 0,
+        MockTick    = 1,
+        MockEmit    = 2
     }
 
 #endregion
@@ -125,6 +126,7 @@ public class CPS : MonoBehaviour
     /// Template of shader which will simulate particles
     /// </summary>
     [SerializeField] public ComputeShader SimulatorTemplate;
+
 #endregion
 
 #region Setting Fields
@@ -177,8 +179,8 @@ public class CPS : MonoBehaviour
 
 #region SimulationFields
 
-    [SerializeField] public int MaximumParticleCount;
-    [SerializeField] public int CurrentParticleCount;
+    [SerializeField] public int MaximumParticleCount; public int CurrentParticleCount;
+    [SerializeField] public int EmissionRate;         public float EmissionAmount;
 
     [SerializeField] public bool UseGravity;
 
@@ -211,12 +213,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Defines number of vertices and instances per graphics buffer 
     /// </summary>
-    GraphicsBuffer commandBuffer;
-
-    /// <summary>
-    /// Number at which compute shader will work
-    /// </summary>
-    int dispatchNum = 0;
+    GraphicsBuffer CommandBuffer;
 
     /// <summary>
     /// Buffer containing simulation state
@@ -236,6 +233,13 @@ public class CPS : MonoBehaviour
     /// 
     GraphicsBuffer GlobalStateBuffer;
 
+    /// <summary>
+    /// Counter buffers
+    /// </summary>
+    ComputeBuffer EmissionAmountCounterBuffer;
+    ComputeBuffer CurrentParticleCountBuffer;
+    ComputeBuffer CopyCounterBuffer;
+
     Transform           tf;
     Material            material;
     Material            sharedMaterial;
@@ -252,7 +256,6 @@ public class CPS : MonoBehaviour
         material        = renderer.material;
         sharedMaterial  = renderer.sharedMaterial;
 
-        FindDispatchNum();
         CreateBuffers();
         InitializeCompute();
         InitializeRenderContext();
@@ -260,45 +263,7 @@ public class CPS : MonoBehaviour
 
     void Start()
     {
-        Simulator.Dispatch((int)SimulatorKernelType.MockInit, dispatchNum, dispatchNum, 1);    
-    }
-
-    void InitializeCompute()
-    {
-        Simulator = Instantiate(SimulatorTemplate);
-        
-        Simulator.SetInt("DISPATCH_NUM", dispatchNum);
-        Simulator.SetInt("COUNT_PER_DIMENSION", 2*dispatchNum);
-        Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
-
-        Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0.0f);
-
-        foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
-        {
-            Simulator.SetBuffer((int)kernel, "SimulationStateBuffer", SimulationStateBuffer);
-        }
-    }
-
-    void FindDispatchNum()
-    {
-        for(int i = 2; i <= 32; i*=2)
-        {
-            if(MaximumParticleCount <= i*i*i*i)
-            {
-                dispatchNum = i;
-                Debug.Log($"Dispatch count: {i*i*i*i}");
-                return;
-            }
-        }
-    }
-
-    void InitializeRenderContext()
-    {
-        renderParams             = new RenderParams(sharedMaterial); // Consider sharedMat or mat
-        renderParams.worldBounds = new Bounds(Vector3.zero, 10000*Vector3.one);
-        renderParams.matProps    = new MaterialPropertyBlock();
-        renderParams.matProps.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
-        renderParams.matProps.SetTexture("_MainTex", MainTexture);
+        Simulator.Dispatch((int)SimulatorKernelType.MockInit, GetDispatchNum(), GetDispatchNum(), 1);    
     }
 
     void OnDestroy()
@@ -309,26 +274,60 @@ public class CPS : MonoBehaviour
     
     void Update()
     {
-        if(this == Singleton)
-        {
-            // TODO: Consider unique prefix for global vars
-            Shader.SetGlobalFloat("DeltaTime", Time.deltaTime);
-            Shader.SetGlobalFloat("Time", Time.time);
+        if(this == Singleton) UpdateGlobalShaderVariables();
+        UpdateLocalShaderVariables();
 
-            UpdateObjectPoints();
-            //renderParams.matProps.SetFloat("DeltaTime", Time.deltaTime);
-            //Simulator.SetFloat("DeltaTime", Time.deltaTime);
-        }
+        //Simulator.Dispatch((int)SimulatorKernelType.MockCounter, GetDispatchNum(), GetDispatchNum(), 1);
 
+        // Emit
+        Simulator.Dispatch((int)SimulatorKernelType.MockEmit, GetDispatchNum(), GetDispatchNum(), 1);
+
+        // Simulate
+        Simulator.Dispatch((int)SimulatorKernelType.MockTick, GetDispatchNum(), GetDispatchNum(), 1);
+        
+        // Render
+        Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, CommandBuffer);
+    }
+     
+    void OnDrawGizmos()
+    {
+        if(!DrawGUI) return;
+
+        DrawStartPosition();
+    }
+     
+    void UpdateLocalShaderVariables()
+    {
         // TODO: Potentially include rotation later
         Matrix4x4 localToWorldMatrix = Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale);
         renderParams.matProps.SetMatrix("ObjectToWorld", localToWorldMatrix);
 
-        Simulator.Dispatch((int)SimulatorKernelType.MockTick, dispatchNum, dispatchNum, 1);
-        Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, commandBuffer);
+        int[] counterValue = new int[1]{ 5 };
+
+        // Synchronise current particle count
+        ComputeBuffer.CopyCount(CurrentParticleCountBuffer, CopyCounterBuffer, 0);
+        CopyCounterBuffer.GetData(counterValue); 
+        CurrentParticleCount = counterValue[0];
+
+        // Update allowed emission amount for this frame
+        ComputeBuffer.CopyCount(EmissionAmountCounterBuffer, CopyCounterBuffer, 0);
+        CopyCounterBuffer.GetData(counterValue);
+        EmissionAmount += EmissionRate * Time.deltaTime;
+        counterValue[0] = Mathf.FloorToInt(EmissionAmount);
+        EmissionAmount = EmissionAmount - counterValue[0];
+        EmissionAmountCounterBuffer.SetCounterValue((uint)counterValue[0]);
     }
 
-    private void UpdateObjectPoints()
+    void UpdateGlobalShaderVariables()
+    {
+        // TODO: Consider unique prefix for global vars
+        Shader.SetGlobalFloat("DeltaTime", Time.deltaTime);
+        Shader.SetGlobalFloat("Time", Time.time);
+
+        UpdateObjectPoints();
+    }
+
+    void UpdateObjectPoints()
     {
         var rot = Matrix4x4.Rotate(Camera.main.transform.rotation);
         
@@ -346,13 +345,6 @@ public class CPS : MonoBehaviour
         //renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }
 
-    void OnDrawGizmos()
-    {
-        if(!DrawGUI) return;
-
-        DrawStartPosition();
-    }
-
     void CreateBuffers()
     {
         SimulationStateBuffer = new GraphicsBuffer
@@ -368,23 +360,78 @@ public class CPS : MonoBehaviour
                 + 2 /* Current_Max_Life */
             ) /*Floats*/ * 4 /*Bytes*/
         );
-        material.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
 
-        GlobalStateBuffer = new GraphicsBuffer(Target.Structured, 1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/);
-        material.SetBuffer("GlobaStateBuffer", GlobalStateBuffer);
+        GlobalStateBuffer = new GraphicsBuffer
+        (
+            Target.Counter, 
+            1,
+            1 /* Int */ * 4 /*Bytes*/
+        );
 
-        var args = new IndirectDrawArgs[1];
-        commandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
-        args[0].vertexCountPerInstance = (uint)MaximumParticleCount;
-        args[0].instanceCount = 1;
-        commandBuffer.SetData(args);
+        EmissionAmountCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
+        CurrentParticleCountBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
+        EmissionAmountCounterBuffer.SetCounterValue(0);
+        CurrentParticleCountBuffer.SetCounterValue(0);
+
+        CopyCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Raw);
+
+        CommandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
+        CommandBuffer.SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs{ vertexCountPerInstance = (uint)MaximumParticleCount, instanceCount = 1 } });
     }
 
     void DeleteBuffers()
     {
-        SimulationStateBuffer?.Dispose();
-        GlobalStateBuffer?.Dispose();
-        commandBuffer?.Dispose();
+        SimulationStateBuffer?.Release();
+        GlobalStateBuffer?.Release();
+        CommandBuffer?.Release();
+        CurrentParticleCountBuffer?.Release();
+        EmissionAmountCounterBuffer?.Release();
+        CopyCounterBuffer?.Release();
+    }
+
+    void InitializeCompute()
+    {
+        Simulator = Instantiate(SimulatorTemplate);
+        //Simulator = Resources.Load("CPSSimulator") as ComputeShader;
+
+        Simulator.SetInt("DISPATCH_NUM", GetDispatchNum());
+        Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
+
+        Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0.0f);
+
+        foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
+        {
+            Simulator.SetBuffer((int)kernel, "SimulationStateBuffer",       SimulationStateBuffer       );
+            //Simulator.SetBuffer((int)kernel, "GlobalStateBuffer",           GlobalStateBuffer           );
+            Simulator.SetBuffer((int)kernel, "CurrentParticleCountBuffer",  CurrentParticleCountBuffer  );
+            Simulator.SetBuffer((int)kernel, "EmissionAmountCounterBuffer", EmissionAmountCounterBuffer );
+        }
+    }
+
+    void InitializeRenderContext()
+    {
+        renderParams             = new RenderParams(material); // Consider sharedMat or mat
+        renderParams.worldBounds = new Bounds(Vector3.zero, 10000*Vector3.one);
+        renderParams.matProps    = new MaterialPropertyBlock();
+        renderParams.matProps.SetBuffer ("SimulationStateBuffer", SimulationStateBuffer );
+        renderParams.matProps.SetBuffer ("GlobalStateBuffer",     GlobalStateBuffer     );
+        renderParams.matProps.SetTexture("_MainTex",              MainTexture           );
+    }
+
+    int _dispatchNum = -1;
+    int GetDispatchNum()
+    {
+        if(_dispatchNum > 0 ) return _dispatchNum;
+
+        for(int i = 2; i <= 32; i*=2)
+        {
+            if(MaximumParticleCount <= i*i*i*i)
+            {
+                _dispatchNum = i;
+                return _dispatchNum;
+            }
+        }
+        throw new Exception("Not happening!");
     }
 
     private void DrawStartPosition()
@@ -757,7 +804,7 @@ public class CPSEditor : Editor
 
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
-    SerializedProperty _CurrentParticleCount;
+    SerializedProperty _EmissionRate;
     SerializedProperty _UseGravity;
 
     // Other
@@ -782,7 +829,7 @@ public class CPSEditor : Editor
         _StartPositionGenerator = _CPS.FindProperty("StartPositionGenerator");
 
         _MaximumParticleCount   = _CPS.FindProperty("MaximumParticleCount");
-        _CurrentParticleCount   = _CPS.FindProperty("CurrentParticleCount");
+        _EmissionRate           = _CPS.FindProperty("EmissionRate");
         _UseGravity             = _CPS.FindProperty("UseGravity");
 
         _MainTexture            = _CPS.FindProperty("MainTexture");
@@ -823,8 +870,17 @@ public class CPSEditor : Editor
     {
         DisabledPropertyField(Application.isPlaying, _MaximumParticleCount);
         _MaximumParticleCount.intValue = Mathf.Clamp(_MaximumParticleCount.intValue, 0, CPS.HARD_LIMIT);
-        DisabledPropertyField(true, _CurrentParticleCount);
+        
+        Disabled(true, () =>
+        {
+            EditorGUILayout.IntField("Current Particle Count", Target.CurrentParticleCount);
+        });
+
+        EditorGUILayout.PropertyField(_EmissionRate);
+        _EmissionRate.intValue = Mathf.Clamp(_EmissionRate.intValue, 0, CPS.HARD_LIMIT);
+
         HorizontalSeparator();
+        
         EditorGUILayout.PropertyField(_UseGravity);
     }
 

@@ -1,0 +1,144 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel MockInit
+#pragma kernel MockTick
+#pragma kernel MockEmit
+
+#define GROUP_SIZE 2
+
+#define RETURN if(ID >= 3) return;
+
+struct SimulationState
+{
+    float3 Position;
+    float3 Scale;
+    float3 Velocity;
+    float3 ExternalVelocity;
+    float3 Colour;
+    float2 Current_Max_Life;
+};
+
+// struct GlobalState
+// {
+// };
+
+
+RWStructuredBuffer<SimulationState> SimulationStateBuffer;
+// RWStructuredBuffer<GlobalState> GlobalStateBuffer;
+RWStructuredBuffer<int> CurrentParticleCountBuffer;
+RWStructuredBuffer<int> EmissionAmountCounterBuffer;
+
+uniform int DISPATCH_NUM; 
+uniform int MAX_PARTICLE_COUNT;
+
+uniform float DeltaTime; 
+uniform float Time;
+
+uniform float GravityForce;
+
+float Hash(float3 p)
+{
+    float h = dot(p, float3(127.1, 311.7, 74.7));
+    return frac(sin(h) * 43758.5453123);
+}
+
+float3 GradientNoise(float3 p, float time)
+{
+    p += float3(time, time * 0.5, time * 0.2);
+
+    float3 i = floor(p);
+    float3 f = frac(p);
+
+    // Smooth interpolation function (e.g., cubic)
+    float3 u = f * f * (3.0 - 2.0 * f);
+
+    return lerp(
+        lerp(
+            lerp(Hash(i + float3(0, 0, 0)), Hash(i + float3(1, 0, 0)), u.x),
+            lerp(Hash(i + float3(0, 1, 0)), Hash(i + float3(1, 1, 0)), u.x),
+            u.y),
+        lerp(
+            lerp(Hash(i + float3(0, 0, 1)), Hash(i + float3(1, 0, 1)), u.x),
+            lerp(Hash(i + float3(0, 1, 1)), Hash(i + float3(1, 1, 1)), u.x),
+            u.y),
+        u.z
+    );
+}
+
+void ResetParticle(uint ID)
+{
+    SimulationStateBuffer[ID].Position          = ID;
+    SimulationStateBuffer[ID].Scale             = ID;
+    SimulationStateBuffer[ID].Velocity          = ID;
+    SimulationStateBuffer[ID].ExternalVelocity  = 0.0f;
+    SimulationStateBuffer[ID].Colour            = GradientNoise(ID, Time);
+    SimulationStateBuffer[ID].Current_Max_Life  = 1;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+void MockInit(uint3 id : SV_DispatchThreadID)
+{
+    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    if((int)ID >= MAX_PARTICLE_COUNT) return;
+    
+    SimulationStateBuffer[ID].Current_Max_Life  = 0.0f;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+void MockEmit(uint3 id : SV_DispatchThreadID)
+{
+    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    if
+    (
+        // Out of scope
+        (int)ID                                      >= MAX_PARTICLE_COUNT ||
+        
+        // Not Dead Yet
+        SimulationStateBuffer[ID].Current_Max_Life.x  > 0.0                ||
+
+        // Max Particles Reached
+        CurrentParticleCountBuffer[0]                == MAX_PARTICLE_COUNT
+
+    ) return;
+    
+    
+    int emissionIndex = EmissionAmountCounterBuffer.DecrementCounter();
+    
+    // Emitted enough already
+    if(emissionIndex < 0) return;
+    
+    // Increment current particle amount
+    CurrentParticleCountBuffer.IncrementCounter();
+    
+    ResetParticle(ID);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+void MockTick(uint3 id : SV_DispatchThreadID)
+{
+    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    if
+    (
+        // Out of scope
+        (int)ID                                      >= MAX_PARTICLE_COUNT ||
+
+        // Dead
+        SimulationStateBuffer[ID].Current_Max_Life.x <= 0.0
+        
+    ) return;
+
+    // Age it
+    SimulationStateBuffer[ID].Current_Max_Life.x -= DeltaTime;
+    
+    // Apply external force
+    SimulationStateBuffer[ID].ExternalVelocity.y += GravityForce * DeltaTime;
+    
+    // Apply velocity
+    SimulationStateBuffer[ID].Position += DeltaTime *
+    (
+        SimulationStateBuffer[ID].Velocity
+        + SimulationStateBuffer[ID].ExternalVelocity
+    );
+    
+    // Remove from the alive pool
+    if (SimulationStateBuffer[ID].Current_Max_Life.x <= 0) CurrentParticleCountBuffer.DecrementCounter();
+}

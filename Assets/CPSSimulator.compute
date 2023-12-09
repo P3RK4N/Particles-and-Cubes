@@ -7,17 +7,21 @@ struct SimulationState
     float3 Position;
     float3 Scale;
     float3 Velocity;
+    float3 OuterVelocity;
     float3 Colour;
     float2 Current_Max_Life;
 };
 
 RWStructuredBuffer<SimulationState> SimulationStateBuffer;
 
-uniform int DISPATCH_NUM;
+uniform int DISPATCH_NUM; 
 uniform int COUNT_PER_DIMENSION;
+uniform int MAX_PARTICLE_COUNT;
 
 uniform float DeltaTime;
 uniform float Time;
+
+uniform float GravityForce;
 
 float Hash(float3 p)
 {
@@ -52,9 +56,12 @@ float3 GradientNoise(float3 p, float time)
 void MockInit(uint3 id : SV_DispatchThreadID)
 {
     uint ID = id.x + id.y * COUNT_PER_DIMENSION;
+    if((int)ID >= MAX_PARTICLE_COUNT) return;
+    
     SimulationStateBuffer[ID].Position          = ID;
     SimulationStateBuffer[ID].Scale             = ID;
-    SimulationStateBuffer[ID].Velocity          = ID / 100.0;
+    SimulationStateBuffer[ID].Velocity          = ID;
+    SimulationStateBuffer[ID].OuterVelocity     = 0.0f;
     SimulationStateBuffer[ID].Colour            = GradientNoise(ID, Time);
     SimulationStateBuffer[ID].Current_Max_Life  = ID;
 }
@@ -63,7 +70,14 @@ void MockInit(uint3 id : SV_DispatchThreadID)
 void MockTick(uint3 id : SV_DispatchThreadID)
 {
     uint ID = id.x + id.y * COUNT_PER_DIMENSION;
+    if((int)ID >= MAX_PARTICLE_COUNT) return;
 
+    SimulationStateBuffer[ID].OuterVelocity.y += GravityForce * DeltaTime;
+    
     SimulationStateBuffer[ID].Current_Max_Life.x -= DeltaTime;
-    SimulationStateBuffer[ID].Position += SimulationStateBuffer[ID].Velocity;
+    SimulationStateBuffer[ID].Position += DeltaTime *
+    (
+        SimulationStateBuffer[ID].Velocity
+        + SimulationStateBuffer[ID].OuterVelocity
+    );
 }

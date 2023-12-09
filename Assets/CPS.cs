@@ -178,7 +178,9 @@ public class CPS : MonoBehaviour
 #region SimulationFields
 
     [SerializeField] public int MaximumParticleCount;
-    [SerializeField] public int CurrentParticleCount = 0;
+    [SerializeField] public int CurrentParticleCount;
+
+    [SerializeField] public bool UseGravity;
 
     /// <summary>
     /// Environmental ForceField stuff (walls, attractors, repulsors)
@@ -267,6 +269,9 @@ public class CPS : MonoBehaviour
         
         Simulator.SetInt("DISPATCH_NUM", dispatchNum);
         Simulator.SetInt("COUNT_PER_DIMENSION", 2*dispatchNum);
+        Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
+
+        Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0.0f);
 
         foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
         {
@@ -350,7 +355,19 @@ public class CPS : MonoBehaviour
 
     void CreateBuffers()
     {
-        SimulationStateBuffer = new GraphicsBuffer(Target.Structured, MaximumParticleCount, (3 + 3 + 3 + 3 + 2) /*Floats*/ * 4 /*Bytes*/);
+        SimulationStateBuffer = new GraphicsBuffer
+        (
+            Target.Structured,
+            MaximumParticleCount,
+            (
+                + 3 /* Position         */
+                + 3 /* Scale            */
+                + 3 /* Velocity         */
+                + 3 /* OuterVelocity    */
+                + 3 /* Colour           */
+                + 2 /* Current_Max_Life */
+            ) /*Floats*/ * 4 /*Bytes*/
+        );
         material.SetBuffer("SimulationStateBuffer", SimulationStateBuffer);
 
         GlobalStateBuffer = new GraphicsBuffer(Target.Structured, 1, 2 /*Vector3*/ * 3 /*Floats*/ * 4 /*Bytes*/);
@@ -741,11 +758,12 @@ public class CPSEditor : Editor
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
     SerializedProperty _CurrentParticleCount;
+    SerializedProperty _UseGravity;
 
     // Other
     SerializedProperty _MainTexture;
 
-    private void OnEnable()
+    void OnEnable()
     {
         // NOTE: Can be automatized with reflection
 
@@ -765,6 +783,7 @@ public class CPSEditor : Editor
 
         _MaximumParticleCount   = _CPS.FindProperty("MaximumParticleCount");
         _CurrentParticleCount   = _CPS.FindProperty("CurrentParticleCount");
+        _UseGravity             = _CPS.FindProperty("UseGravity");
 
         _MainTexture            = _CPS.FindProperty("MainTexture");
     }
@@ -803,10 +822,10 @@ public class CPSEditor : Editor
     void SimulationSubMenu()
     {
         DisabledPropertyField(Application.isPlaying, _MaximumParticleCount);
-        _MaximumParticleCount.intValue = Mathf.Min(_MaximumParticleCount.intValue, CPS.HARD_LIMIT);
+        _MaximumParticleCount.intValue = Mathf.Clamp(_MaximumParticleCount.intValue, 0, CPS.HARD_LIMIT);
         DisabledPropertyField(true, _CurrentParticleCount);
-
-        //HorizontalSeparator();
+        HorizontalSeparator();
+        EditorGUILayout.PropertyField(_UseGravity);
     }
 
     void EndSubMenu()

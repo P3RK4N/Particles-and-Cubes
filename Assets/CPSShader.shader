@@ -29,6 +29,7 @@ Shader "Unlit/ParticleShader"
                 float3 OffsetWS;
                 float3 Scale;
                 float3 Velocity;
+                float3 OuterVelocity;
                 float3 Colour;
                 float2 Current_Max_life;
             };

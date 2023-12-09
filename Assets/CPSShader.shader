@@ -24,6 +24,27 @@ Shader "Unlit/ParticleShader"
             #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawArgs
             #include "UnityIndirect.cginc"
 
+            static const int GLOBAL_SPACE       = 1;
+            static const int LOCAL_SPACE        = 0;
+
+            static const int RENDER_BILLBOARD   = 0;
+            static const int RENDER_POINT       = 1;
+            static const int RENDER_MESH        = 2;
+
+            static const int SCALAR_EXACT       = 0;
+            static const int SCALAR_RANGED      = 1;
+            static const int SCALAR_GAUSSIAN    = 2;
+
+            static const int FUNCTION_POINT     = 0;
+            static const int FUNCTION_SPHERE    = 1;
+            static const int FUNCTION_PLANE     = 2;
+            static const int FUNCTION_CUBOID    = 3;
+
+            static const int FALLOFF_ROOT       = 0;
+            static const int FALLOFF_LINEAR     = 1;
+            static const int FALLOFF_QUADRATIC  = 2;
+            static const int FALLOFF_CUBOID     = 3;
+
             struct SimulationState
             {
                 float3 Position;
@@ -33,9 +54,15 @@ Shader "Unlit/ParticleShader"
                 float3 Colour;
                 float2 Current_Max_Life;
             };
+
             StructuredBuffer<SimulationState> SimulationStateBuffer;
+            
             cbuffer GlobalState
             {
+                // Settings Stuff
+                int SimulationSpace;
+                int RenderType;
+
                 // Kernel Stuff
                 int DISPATCH_NUM;
                 int MAX_PARTICLE_COUNT;
@@ -125,6 +152,9 @@ Shader "Unlit/ParticleShader"
 
                 uint id = input[0].ID;
                 if(SimulationStateBuffer[id].Current_Max_Life.x <= 0) { return; }
+
+                // Make Particle TRS
+
 
                 float4 offsetWS = float4(SimulationStateBuffer[id].Position, 1);
                 float4 scale    = float4(SimulationStateBuffer[id].Scale,    1);

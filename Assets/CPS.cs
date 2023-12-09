@@ -123,7 +123,7 @@ public class CPS : MonoBehaviour
     }
 
     //[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    static int GlobalStateDTOSize = 44;
+    static int GlobalStateDTOSize = 46;
     struct GlobalStateDTO
     {
         // Kernel Stuff
@@ -361,11 +361,11 @@ public class CPS : MonoBehaviour
         DrawStartPosition();
     }
     
-
     void RefreshGlobalStateBuffer()
     {
-        // Set transform Stuff
-        Simulator.SetMatrix("ObjectToWorld", Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale));
+        // Set Settings Stuff
+        Simulator.SetInt("SimulationSpace", ((int)SimulationSpace));
+        Simulator.SetInt("RenderType",      ((int)RenderType));
         
         // Set kernel-related values
         Simulator.SetInt("DISPATCH_NUM", GetDispatchNum());

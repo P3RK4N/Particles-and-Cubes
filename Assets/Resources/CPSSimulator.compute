@@ -5,19 +5,26 @@
 
 #define GROUP_SIZE 32
 
-static const int SCALAR_EXACT    = 0;
-static const int SCALAR_RANGED   = 1;
-static const int SCALAR_GAUSSIAN = 2;
+static const int GLOBAL_SPACE       = 1;
+static const int LOCAL_SPACE        = 0;
 
-static const int FUNCTION_POINT  = 0;
-static const int FUNCTION_SPHERE = 1;
-static const int FUNCTION_PLANE  = 2;
-static const int FUNCTION_CUBOID = 3;
+static const int RENDER_BILLBOARD   = 0;
+static const int RENDER_POINT       = 1;
+static const int RENDER_MESH        = 2;
 
-static const int FALLOFF_ROOT      = 0;
-static const int FALLOFF_LINEAR    = 1;
-static const int FALLOFF_QUADRATIC = 2;
-static const int FALLOFF_CUBOID    = 3;
+static const int SCALAR_EXACT       = 0;
+static const int SCALAR_RANGED      = 1;
+static const int SCALAR_GAUSSIAN    = 2;
+
+static const int FUNCTION_POINT     = 0;
+static const int FUNCTION_SPHERE    = 1;
+static const int FUNCTION_PLANE     = 2;
+static const int FUNCTION_CUBOID    = 3;
+
+static const int FALLOFF_ROOT       = 0;
+static const int FALLOFF_LINEAR     = 1;
+static const int FALLOFF_QUADRATIC  = 2;
+static const int FALLOFF_CUBOID     = 3;
 
 struct SimulationState
 {
@@ -28,11 +35,14 @@ struct SimulationState
     float3 Colour;
     float2 Current_Max_Life;
 };
+
 RWStructuredBuffer<SimulationState> SimulationStateBuffer;
+
 cbuffer GlobalState
 {
-    // Transform Stuff
-    float4x4 ObjectToWorld;
+    // Settings Stuff
+    int SimulationSpace;
+    int RenderType;
     
     // Kernel Stuff
     int DISPATCH_NUM;

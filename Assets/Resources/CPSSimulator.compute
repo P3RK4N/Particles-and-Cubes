@@ -3,9 +3,21 @@
 #pragma kernel MockTick
 #pragma kernel MockEmit
 
-#define GROUP_SIZE 2
+#define GROUP_SIZE 32
 
-#define RETURN if(ID >= 3) return;
+static const int SCALAR_EXACT    = 0;
+static const int SCALAR_RANGED   = 1;
+static const int SCALAR_GAUSSIAN = 2;
+
+static const int FUNCTION_POINT  = 0;
+static const int FUNCTION_SPHERE = 1;
+static const int FUNCTION_PLANE  = 2;
+static const int FUNCTION_CUBOID = 3;
+
+static const int FALLOFF_ROOT      = 0;
+static const int FALLOFF_LINEAR    = 1;
+static const int FALLOFF_QUADRATIC = 2;
+static const int FALLOFF_CUBOID    = 3;
 
 struct SimulationState
 {
@@ -16,24 +28,59 @@ struct SimulationState
     float3 Colour;
     float2 Current_Max_Life;
 };
-
-// struct GlobalState
-// {
-// };
-
-
 RWStructuredBuffer<SimulationState> SimulationStateBuffer;
-// RWStructuredBuffer<GlobalState> GlobalStateBuffer;
-RWStructuredBuffer<int> CurrentParticleCountBuffer;
-RWStructuredBuffer<int> EmissionAmountCounterBuffer;
+cbuffer GlobalState
+{
+    // Transform Stuff
+    float4x4 ObjectToWorld;
+    
+    // Kernel Stuff
+    int DISPATCH_NUM;
+    int MAX_PARTICLE_COUNT;
 
-uniform int DISPATCH_NUM; 
-uniform int MAX_PARTICLE_COUNT;
+    // Time Stuff
+    float DeltaTime;
+    float Time;
 
-uniform float DeltaTime; 
-uniform float Time;
+    // Environment Stuff
+    float GravityForce;
+    
+    // TODO: Expand existing ones
+ 
+    // Lifetime
+    int LifetimeScalarType;
+    float ExactLifetime;
+    float BottomLifetime;
+    float TopLifetime;
 
-uniform float GravityForce;
+    // Position
+    int PositionFunctionType;
+    float3 CenterOffset;
+    float Radius;
+    
+    // Velocity
+    int VelocityScalarType;
+    float3 ExactVelocity;
+    float3 BottomVelocity;
+    float3 TopVelocity;
+    
+    // Scale
+    int ScaleScalarType;
+    float3 ExactScale;
+    float3 BottomScale;
+    float3 TopScale;
+    
+    // Rotation
+    int RotationScalarType;
+    float3 ExactRotation;
+    float3 BottomRotation;
+    float3 TopRotation;
+    
+    // TODO: Expand new ones
+}; 
+
+RWStructuredBuffer<int>             CurrentParticleCountBuffer;
+RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
 
 float Hash(float3 p)
 {

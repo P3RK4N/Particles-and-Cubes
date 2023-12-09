@@ -9,6 +9,10 @@ using UnityEditor.UIElements;
 using static UnityEngine.GraphicsBuffer;
 using Unity.Mathematics;
 using UnityEngine.UIElements;
+using System.Reflection;
+
+using System.Runtime.InteropServices;
+
 
 
 
@@ -116,6 +120,55 @@ public class CPS : MonoBehaviour
         [SerializeField] public float Intensity;
         [SerializeField] public Vector3 Coefficients;
         [SerializeField] FunctionGenerator Generator;
+    }
+
+    //[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    static int GlobalStateDTOSize = 44;
+    struct GlobalStateDTO
+    {
+        // Kernel Stuff
+        public int DISPATCH_NUM;
+        public int MAX_PARTICLE_COUNT;
+
+        // Time Stuff
+        public float DeltaTime;
+        public float Time;
+
+        // Environment Stuff
+        public float GravityForce;
+    
+        // TODO: Expand existing ones
+ 
+        // Lifetime
+        public int LifetimeScalarType;
+        public float ExactLifetime;
+        public float BottomLifetime;
+        public float TopLifetime;
+
+        // Position
+        public int PositionFunctionType;
+        public float3 CenterOffset;
+        public float Radius;
+    
+        // Velocity
+        public int VelocityScalarType;
+        public float3 ExactVelocity;
+        public float3 BottomVelocity;
+        public float3 TopVelocity;
+    
+        // Scale
+        public int ScaleScalarType;
+        public float3 ExactScale;
+        public float3 BottomScale;
+        public float3 TopScale;
+    
+        // Rotation
+        public int RotationScalarType;
+        public float3 ExactRotation;
+        public float3 BottomRotation;
+        public float3 TopRotation;
+    
+        // TODO: Expand new ones
     }
 
 #endregion 
@@ -263,6 +316,7 @@ public class CPS : MonoBehaviour
 
     void Start()
     {
+        RefreshGlobalStateBuffer();
         Simulator.Dispatch((int)SimulatorKernelType.MockInit, GetDispatchNum(), GetDispatchNum(), 1);    
     }
 
@@ -276,8 +330,7 @@ public class CPS : MonoBehaviour
     {
         if(this == Singleton) UpdateGlobalShaderVariables();
         UpdateLocalShaderVariables();
-
-        //Simulator.Dispatch((int)SimulatorKernelType.MockCounter, GetDispatchNum(), GetDispatchNum(), 1);
+        SynchronizeCounters();
 
         // Emit
         Simulator.Dispatch((int)SimulatorKernelType.MockEmit, GetDispatchNum(), GetDispatchNum(), 1);
@@ -288,21 +341,76 @@ public class CPS : MonoBehaviour
         // Render
         Graphics.RenderPrimitivesIndirect(renderParams, MeshTopology.Points, CommandBuffer);
     }
-     
+
+    void OnValidate()
+    {
+        if
+        (
+            Application.isPlaying &&
+            tf != null
+        )
+        {
+            RefreshGlobalStateBuffer();
+        }
+    }
+
     void OnDrawGizmos()
     {
         if(!DrawGUI) return;
 
         DrawStartPosition();
     }
-     
-    void UpdateLocalShaderVariables()
-    {
-        // TODO: Potentially include rotation later
-        Matrix4x4 localToWorldMatrix = Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale);
-        renderParams.matProps.SetMatrix("ObjectToWorld", localToWorldMatrix);
+    
 
-        int[] counterValue = new int[1]{ 5 };
+    void RefreshGlobalStateBuffer()
+    {
+        // Set transform Stuff
+        Simulator.SetMatrix("ObjectToWorld", Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale));
+        
+        // Set kernel-related values
+        Simulator.SetInt("DISPATCH_NUM", GetDispatchNum());
+        Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
+
+        // Set time-related values
+        Simulator.SetFloat("DeltaTime", Time.deltaTime);
+        Simulator.SetFloat("Time", Time.time);
+
+        // Set environment-related values
+        Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0);
+
+        // Set lifetime-related values
+        Simulator.SetInt("LifetimeScalarType", ((int)StartLifetimeGenerator.Type));
+        Simulator.SetFloat("ExactLifetime", StartLifetimeGenerator.ExactScalar);
+        Simulator.SetFloat("BottomLifetime", StartLifetimeGenerator.BottomScalar);
+        Simulator.SetFloat("TopLifetime", StartLifetimeGenerator.TopScalar);
+
+        // Set position-related values
+        Simulator.SetInt("PositionFunctionType", ((int)StartPositionGenerator.Type));
+        Simulator.SetVector("CenterOffset", StartPositionGenerator.CenterOffset);
+        Simulator.SetFloat("Radius", StartPositionGenerator.Radius);
+
+        // Set velocity-related values
+        Simulator.SetInt("VelocityScalarType", ((int)StartVelocityGenerator.Type));
+        Simulator.SetVector("ExactVelocity", StartVelocityGenerator.ExactScalar);
+        Simulator.SetVector("BottomVelocity", StartVelocityGenerator.BottomScalar);
+        Simulator.SetVector("TopVelocity", StartVelocityGenerator.TopScalar);
+
+        // Set scale-related values
+        Simulator.SetInt("ScaleScalarType", ((int)StartScaleGenerator.Type));
+        Simulator.SetVector("ExactScale", StartScaleGenerator.ExactScalar);
+        Simulator.SetVector("BottomScale", StartScaleGenerator.BottomScalar);
+        Simulator.SetVector("TopScale", StartScaleGenerator.TopScalar);
+
+        // Set rotation-related values
+        Simulator.SetInt("RotationScalarType", ((int)StartRotationGenerator.Type));
+        Simulator.SetVector("ExactRotation", StartRotationGenerator.ExactScalar);
+        Simulator.SetVector("BottomRotation", StartRotationGenerator.BottomScalar);
+        Simulator.SetVector("TopRotation", StartRotationGenerator.TopScalar);
+    }
+
+    void SynchronizeCounters()
+    {
+        int[] counterValue = new int[1];
 
         // Synchronise current particle count
         ComputeBuffer.CopyCount(CurrentParticleCountBuffer, CopyCounterBuffer, 0);
@@ -318,12 +426,18 @@ public class CPS : MonoBehaviour
         EmissionAmountCounterBuffer.SetCounterValue((uint)counterValue[0]);
     }
 
+    void UpdateLocalShaderVariables()
+    {
+        Simulator.SetFloat("DeltaTime", Time.deltaTime);
+        Simulator.SetFloat("Time", Time.time);
+
+        // TODO: Potentially include rotation and scale later
+        renderParams.matProps.SetMatrix("ObjectToWorld", Matrix4x4.TRS(tf.position, Quaternion.identity, new Vector3(1,1,1)));
+    }
+
     void UpdateGlobalShaderVariables()
     {
         // TODO: Consider unique prefix for global vars
-        Shader.SetGlobalFloat("DeltaTime", Time.deltaTime);
-        Shader.SetGlobalFloat("Time", Time.time);
-
         UpdateObjectPoints();
     }
 
@@ -347,6 +461,7 @@ public class CPS : MonoBehaviour
 
     void CreateBuffers()
     {
+        // Simulation state buffer
         SimulationStateBuffer = new GraphicsBuffer
         (
             Target.Structured,
@@ -361,20 +476,22 @@ public class CPS : MonoBehaviour
             ) /*Floats*/ * 4 /*Bytes*/
         );
 
+        // Global state buffer
         GlobalStateBuffer = new GraphicsBuffer
         (
-            Target.Counter, 
-            1,
-            1 /* Int */ * 4 /*Bytes*/
+            Target.Constant, 
+            GlobalStateDTOSize,
+            4
         );
 
+        // Counters && CopyCount buffer
         EmissionAmountCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
         CurrentParticleCountBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
         EmissionAmountCounterBuffer.SetCounterValue(0);
         CurrentParticleCountBuffer.SetCounterValue(0);
-
         CopyCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Raw);
 
+        // Command Buffer
         CommandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
         CommandBuffer.SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs{ vertexCountPerInstance = (uint)MaximumParticleCount, instanceCount = 1 } });
     }
@@ -392,17 +509,16 @@ public class CPS : MonoBehaviour
     void InitializeCompute()
     {
         Simulator = Instantiate(SimulatorTemplate);
-        //Simulator = Resources.Load("CPSSimulator") as ComputeShader;
 
-        Simulator.SetInt("DISPATCH_NUM", GetDispatchNum());
-        Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
+        //Simulator.SetInt("DISPATCH_NUM", GetDispatchNum());
+        //Simulator.SetInt("MAX_PARTICLE_COUNT", MaximumParticleCount);
 
-        Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0.0f);
+        //Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0.0f);
 
         foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
         {
             Simulator.SetBuffer((int)kernel, "SimulationStateBuffer",       SimulationStateBuffer       );
-            //Simulator.SetBuffer((int)kernel, "GlobalStateBuffer",           GlobalStateBuffer           );
+            Simulator.SetBuffer((int)kernel, "GlobalStateBuffer",           GlobalStateBuffer           );
             Simulator.SetBuffer((int)kernel, "CurrentParticleCountBuffer",  CurrentParticleCountBuffer  );
             Simulator.SetBuffer((int)kernel, "EmissionAmountCounterBuffer", EmissionAmountCounterBuffer );
         }
@@ -410,7 +526,7 @@ public class CPS : MonoBehaviour
 
     void InitializeRenderContext()
     {
-        renderParams             = new RenderParams(material); // Consider sharedMat or mat
+        renderParams             = new RenderParams(Instantiate(material)); // Consider sharedMat or mat
         renderParams.worldBounds = new Bounds(Vector3.zero, 10000*Vector3.one);
         renderParams.matProps    = new MaterialPropertyBlock();
         renderParams.matProps.SetBuffer ("SimulationStateBuffer", SimulationStateBuffer );
@@ -433,8 +549,7 @@ public class CPS : MonoBehaviour
         }
         throw new Exception("Not happening!");
     }
-
-    private void DrawStartPosition()
+    void DrawStartPosition()
     {
         switch(StartPositionGenerator.Type)
         {
@@ -455,7 +570,7 @@ public class CPS : MonoBehaviour
         }
     }
 
-    void DrawCuboid(Vector3 bottom, Vector3 top)
+    static void DrawCuboid(Vector3 bottom, Vector3 top)
     {
         Gizmos.color = Color.white;
 

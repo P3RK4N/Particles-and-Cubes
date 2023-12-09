@@ -140,7 +140,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &325595976
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -566,9 +566,9 @@ MonoBehaviour:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
     Radius: 1.9
-  MaximumParticleCount: 10
+  MaximumParticleCount: 9811
   CurrentParticleCount: 0
-  EmissionRate: 8
+  EmissionRate: 8597
   EmissionAmount: 0
   UseGravity: 1
   ForceFields: []

@@ -26,12 +26,59 @@ Shader "Unlit/ParticleShader"
 
             struct SimulationState
             {
-                float3 OffsetWS;
+                float3 Position;
                 float3 Scale;
                 float3 Velocity;
                 float3 ExternalVelocity;
                 float3 Colour;
-                float2 Current_Max_life;
+                float2 Current_Max_Life;
+            };
+            StructuredBuffer<SimulationState> SimulationStateBuffer;
+            cbuffer GlobalState
+            {
+                // Kernel Stuff
+                int DISPATCH_NUM;
+                int MAX_PARTICLE_COUNT;
+
+                // Time Stuff
+                float DeltaTime;
+                float Time;
+
+                // Environment Stuff
+                float GravityForce;
+    
+                // TODO: Expand existing ones
+ 
+                // Lifetime
+                int LifetimeScalarType;
+                float ExactLifetime;
+                float BottomLifetime;
+                float TopLifetime;
+
+                // Position
+                int PositionFunctionType;
+                float3 CenterOffset;
+                float Radius;
+    
+                // Velocity
+                int VelocityScalarType;
+                float3 ExactVelocity;
+                float3 BottomVelocity;
+                float3 TopVelocity;
+    
+                // Scale
+                int ScaleScalarType;
+                float3 ExactScale;
+                float3 BottomScale;
+                float3 TopScale;
+    
+                // Rotation
+                int RotationScalarType;
+                float3 ExactRotation;
+                float3 BottomRotation;
+                float3 TopRotation;
+    
+                // TODO: Expand new ones
             };
 
             struct GEOM_IN
@@ -49,13 +96,10 @@ Shader "Unlit/ParticleShader"
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-            StructuredBuffer<SimulationState> SimulationStateBuffer;
 
             CBUFFER_START(UnityPerMaterial)
                 float4      ObjectPoints[4];
                 float4x4    ObjectToWorld;
-                float       DeltaTime;
-                float       Time;
             CBUFFER_END
 
             GEOM_IN vert (uint VertexID : SV_VertexID)
@@ -80,9 +124,9 @@ Shader "Unlit/ParticleShader"
                 FRAG_IN OUT = (FRAG_IN)0;
 
                 uint id = input[0].ID;
-                if(SimulationStateBuffer[id].Current_Max_life.x <= 0) { return; }
+                if(SimulationStateBuffer[id].Current_Max_Life.x <= 0) { return; }
 
-                float4 offsetWS = float4(SimulationStateBuffer[id].OffsetWS, 1);
+                float4 offsetWS = float4(SimulationStateBuffer[id].Position, 1);
                 float4 scale    = float4(SimulationStateBuffer[id].Scale,    1);
                 OUT.Colour      = half4(SimulationStateBuffer[id].Colour,    1);
 

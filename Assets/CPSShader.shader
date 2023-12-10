@@ -45,14 +45,18 @@ Shader "Unlit/ParticleShader"
             static const int FALLOFF_QUADRATIC  = 2;
             static const int FALLOFF_CUBOID     = 3;
 
+            #define DEG2RAD (3.1415926535897932384626433832795 / 180.0)
+
             struct SimulationState
             {
-                float3 Position;
-                float3 Scale;
-                float3 Velocity;
-                float3 ExternalVelocity;
-                float3 Colour;
-                float2 Current_Max_Life;
+                float3  Position;
+                float3  Scale;
+                float3  Rotation;
+                float3  Velocity;
+                float3  ExternalVelocity;
+                float3  Colour;
+                float2  Current_Max_Life;
+                int2    SimSpace_RendType;
             };
 
             StructuredBuffer<SimulationState> SimulationStateBuffer;
@@ -72,6 +76,7 @@ Shader "Unlit/ParticleShader"
                 float Time;
 
                 // Environment Stuff
+                float3 EmitterPositionWS;
                 float GravityForce;
     
                 // TODO: Expand existing ones
@@ -125,7 +130,7 @@ Shader "Unlit/ParticleShader"
 
 
             CBUFFER_START(UnityPerMaterial)
-                float4      ObjectPoints[4];
+                float4      BillboardPoints[4];
                 float4x4    ObjectToWorld;
             CBUFFER_END
 
@@ -145,6 +150,33 @@ Shader "Unlit/ParticleShader"
                 float2(1, 1)
             };
 
+            // static float4 NonBillboardPoints[4] =
+            // {
+            //     float4(-0.5, -0.5, 0, 1),
+            //     float4(-0.5, +0.5, 0, 1),
+            //     float4(+0.5, -0.5, 0, 1),
+            //     float4(+0.5, +0.5, 0, 1)
+            // };
+
+            float4x4 EulerRotation(float3 xyz)
+            {
+                xyz /= DEG2RAD;
+
+                float3 c, s;
+                sincos(xyz, s, c);
+
+                float sXsY = s.x * s.y;
+                float cXsY = c.x * s.y;
+
+                return float4x4
+                (
+                    c.y * c.z,      sXsY * c.z - c.x * s.z,     cXsY * c.z + s.x * s.z,     0,
+                    c.y * s.z,      sXsY * s.z + c.x * c.z,     cXsY * s.z - s.x * c.z,     0,
+                    - s.y,          s.x * c.y,                  c.x * c.y,                  0,
+                    0,              0,                          0,                          1
+                );
+            }
+
             [maxvertexcount(4)]
             void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
             {
@@ -153,20 +185,65 @@ Shader "Unlit/ParticleShader"
                 uint id = input[0].ID;
                 if(SimulationStateBuffer[id].Current_Max_Life.x <= 0) { return; }
 
-                // Make Particle TRS
+                OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
+                int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
+                float3 pos      = SimulationStateBuffer[id].Position;
+                float3 rot      = SimulationStateBuffer[id].Rotation;
+                float3 scale    = SimulationStateBuffer[id].Scale;
+                
+                /*
 
+                    * DO THIS IN SEQUENCE *
 
-                float4 offsetWS = float4(SimulationStateBuffer[id].Position, 1);
-                float4 scale    = float4(SimulationStateBuffer[id].Scale,    1);
-                OUT.Colour      = half4(SimulationStateBuffer[id].Colour,    1);
+                    if LOCAL_SPACE:
+                        - Position is LocalPosition
+                        - Rotation is LocalRotation
+                        - Scale is LocalScale
+                        - Multiply all by Emitter's ObjectToWorld
 
-                [unroll]
-                for(int i = 0; i < 4; i++)
+                    if WORLD_SPACE:
+                        - Start Position is EmitterPosition + OffsetWS
+                        - Rotation is Rotation (We do not want to add to EmitterRotation)
+                        - Scale is Scale (We do not want to multiply with EmitterScale)
+
+                    if BILLBOARD:
+                        - Override Rotation
+
+                */
+
+                // TODO: Make Particle TRS
+
+                float4x4 localTS = float4x4
+                (
+                    scale.x,    0,          0,          pos.x,
+                    0,          scale.y,    0,          pos.y,
+                    0,          0,          scale.z,    pos.z,
+                    0,          0,          0,          1
+                );
+
+                // Local Space
+                if(space == LOCAL_SPACE)
                 {
-                    float4 posWS = mul(ObjectToWorld, ObjectPoints[i] * scale);
-                    OUT.PositionCS = UnityWorldToClipPos(posWS + offsetWS);
-                    OUT.UV = UVs[i];
-                    output.Append(OUT);
+                    [unroll]
+                    for(int i = 0; i < 4; i++)
+                    {
+                        float4 posWS = mul(ObjectToWorld, mul(localTS, mul(EulerRotation(rot), BillboardPoints[i]) ) );
+                        OUT.PositionCS = UnityWorldToClipPos(posWS);
+                        OUT.UV = UVs[i];
+                        output.Append(OUT);
+                    }
+                }
+                // World Space
+                else
+                {
+                    [unroll]
+                    for(int i = 0; i < 4; i++)
+                    {
+                        float4 posWS = mul(localTS, mul(EulerRotation(rot), BillboardPoints[i]));
+                        OUT.PositionCS = UnityWorldToClipPos(posWS);
+                        OUT.UV = UVs[i];
+                        output.Append(OUT);
+                    }
                 }
                 
                 output.RestartStrip();

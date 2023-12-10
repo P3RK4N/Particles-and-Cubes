@@ -140,7 +140,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &325595976
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -226,7 +226,7 @@ MonoBehaviour:
   StartPositionGenerator:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
-    Radius: 1.9
+    Radius: 0
   MaximumParticleCount: 10
   CurrentParticleCount: 0
   EmissionRate: 10
@@ -535,7 +535,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   SimulatorTemplate: {fileID: 7200000, guid: 50371e5b651fc8843ba6aed691afe716, type: 3}
-  SimulationSpace: 1
+  SimulationSpace: 0
   RenderType: 1
   DrawGUI: 1
   StartVelocityGenerator:
@@ -563,12 +563,12 @@ MonoBehaviour:
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
   StartPositionGenerator:
-    Type: 1
+    Type: 0
     CenterOffset: {x: 0, y: 0, z: 0}
     Radius: 1.9
-  MaximumParticleCount: 9811
+  MaximumParticleCount: 737
   CurrentParticleCount: 0
-  EmissionRate: 8597
+  EmissionRate: 587
   EmissionAmount: 0
   UseGravity: 1
   ForceFields: []

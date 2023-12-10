@@ -123,53 +123,7 @@ public class CPS : MonoBehaviour
     }
 
     //[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    static int GlobalStateDTOSize = 46;
-    struct GlobalStateDTO
-    {
-        // Kernel Stuff
-        public int DISPATCH_NUM;
-        public int MAX_PARTICLE_COUNT;
-
-        // Time Stuff
-        public float DeltaTime;
-        public float Time;
-
-        // Environment Stuff
-        public float GravityForce;
-    
-        // TODO: Expand existing ones
- 
-        // Lifetime
-        public int LifetimeScalarType;
-        public float ExactLifetime;
-        public float BottomLifetime;
-        public float TopLifetime;
-
-        // Position
-        public int PositionFunctionType;
-        public float3 CenterOffset;
-        public float Radius;
-    
-        // Velocity
-        public int VelocityScalarType;
-        public float3 ExactVelocity;
-        public float3 BottomVelocity;
-        public float3 TopVelocity;
-    
-        // Scale
-        public int ScaleScalarType;
-        public float3 ExactScale;
-        public float3 BottomScale;
-        public float3 TopScale;
-    
-        // Rotation
-        public int RotationScalarType;
-        public float3 ExactRotation;
-        public float3 BottomRotation;
-        public float3 TopRotation;
-    
-        // TODO: Expand new ones
-    }
+    static int GlobalStateDTOSize = 49;
 
 #endregion 
 
@@ -376,6 +330,7 @@ public class CPS : MonoBehaviour
         Simulator.SetFloat("Time", Time.time);
 
         // Set environment-related values
+        Simulator.SetVector("EmitterPositionWS", tf.position);
         Simulator.SetFloat("GravityForce", UseGravity ? -9.81f : 0);
 
         // Set lifetime-related values
@@ -428,24 +383,26 @@ public class CPS : MonoBehaviour
 
     void UpdateLocalShaderVariables()
     {
+        Simulator.SetVector("EmitterPositionWS", tf.position);
         Simulator.SetFloat("DeltaTime", Time.deltaTime);
         Simulator.SetFloat("Time", Time.time);
 
         // TODO: Potentially include rotation and scale later
-        renderParams.matProps.SetMatrix("ObjectToWorld", Matrix4x4.TRS(tf.position, Quaternion.identity, new Vector3(1,1,1)));
+        //renderParams.matProps.SetMatrix("ObjectToWorld", Matrix4x4.TRS(tf.position, Quaternion.identity, new Vector3(1,1,1)));
+        renderParams.matProps.SetMatrix("ObjectToWorld", tf.localToWorldMatrix);
     }
 
     void UpdateGlobalShaderVariables()
     {
         // TODO: Consider unique prefix for global vars
-        UpdateObjectPoints();
+        UpdateBillboardPoints();
     }
 
-    void UpdateObjectPoints()
+    void UpdateBillboardPoints()
     {
         var rot = Matrix4x4.Rotate(Camera.main.transform.rotation);
         
-        Vector4[] objectPoints = new Vector4[]
+        Vector4[] billboardPoints = new Vector4[]
         {
             rot * (- Vector3.right - Vector3.up),
             rot * (- Vector3.right + Vector3.up),
@@ -453,9 +410,9 @@ public class CPS : MonoBehaviour
             rot * (  Vector3.right + Vector3.up)
         };
 
-        for(int i = 0; i < 4; i++) objectPoints[i].w = 1.0f;
+        for(int i = 0; i < 4; i++) billboardPoints[i].w = 1.0f;
 
-        Shader.SetGlobalVectorArray("ObjectPoints", objectPoints);
+        Shader.SetGlobalVectorArray("BillboardPoints", billboardPoints);
         //renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }
 
@@ -467,12 +424,14 @@ public class CPS : MonoBehaviour
             Target.Structured,
             MaximumParticleCount,
             (
-                + 3 /* Position         */
-                + 3 /* Scale            */
-                + 3 /* Velocity         */
-                + 3 /* OuterVelocity    */
-                + 3 /* Colour           */
-                + 2 /* Current_Max_Life */
+                + 3 /* Position          */
+                + 3 /* Scale             */
+                + 3 /* Rotation          */
+                + 3 /* Velocity          */
+                + 3 /* OuterVelocity     */
+                + 3 /* Colour            */
+                + 2 /* Current_Max_Life  */
+                + 2 /* SimSpace_RendType */
             ) /*Floats*/ * 4 /*Bytes*/
         );
 

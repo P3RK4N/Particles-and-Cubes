@@ -28,12 +28,14 @@ static const int FALLOFF_CUBOID     = 3;
 
 struct SimulationState
 {
-    float3 Position;
-    float3 Scale;
-    float3 Velocity;
-    float3 ExternalVelocity;
-    float3 Colour;
-    float2 Current_Max_Life;
+    float3  Position;
+    float3  Scale;
+    float3  Rotation;
+    float3  Velocity;
+    float3  ExternalVelocity;
+    float3  Colour;
+    float2  Current_Max_Life;
+    int2    SimSpace_RendType;
 };
 
 RWStructuredBuffer<SimulationState> SimulationStateBuffer;
@@ -53,6 +55,7 @@ cbuffer GlobalState
     float Time;
 
     // Environment Stuff
+    float3 EmitterPositionWS;
     float GravityForce;
     
     // TODO: Expand existing ones
@@ -123,12 +126,14 @@ float3 GradientNoise(float3 p, float time)
 
 void ResetParticle(uint ID)
 {
-    SimulationStateBuffer[ID].Position          = ID;
+    SimulationStateBuffer[ID].Position          = ID + CenterOffset + (SimulationSpace * EmitterPositionWS);
     SimulationStateBuffer[ID].Scale             = ID;
+    SimulationStateBuffer[ID].Rotation          = 0;
     SimulationStateBuffer[ID].Velocity          = ID;
     SimulationStateBuffer[ID].ExternalVelocity  = 0.0f;
     SimulationStateBuffer[ID].Colour            = GradientNoise(ID, Time);
     SimulationStateBuffer[ID].Current_Max_Life  = 1;
+    SimulationStateBuffer[ID].SimSpace_RendType = int2(SimulationSpace, RenderType);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, 1)]

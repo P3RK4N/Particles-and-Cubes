@@ -24,8 +24,8 @@ Shader "Unlit/ParticleShader"
             #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawArgs
             #include "UnityIndirect.cginc"
 
-            static const int GLOBAL_SPACE       = 1;
             static const int LOCAL_SPACE        = 0;
+            static const int GLOBAL_SPACE       = 1;
 
             static const int RENDER_BILLBOARD   = 0;
             static const int RENDER_POINT       = 1;
@@ -64,6 +64,7 @@ Shader "Unlit/ParticleShader"
             cbuffer GlobalState
             {
                 // Settings Stuff
+                int Seed;
                 int SimulationSpace;
                 int RenderType;
 
@@ -100,6 +101,7 @@ Shader "Unlit/ParticleShader"
     
                 // Scale
                 int ScaleScalarType;
+                int UniformScale;
                 float3 ExactScale;
                 float3 BottomScale;
                 float3 TopScale;
@@ -132,6 +134,7 @@ Shader "Unlit/ParticleShader"
             CBUFFER_START(UnityPerMaterial)
                 float4      BillboardPoints[4];
                 float4x4    ObjectToWorld;
+                float4x4    ObjectToWorldNoRot;
             CBUFFER_END
 
             GEOM_IN vert (uint VertexID : SV_VertexID)
@@ -150,17 +153,17 @@ Shader "Unlit/ParticleShader"
                 float2(1, 1)
             };
 
-            // static float4 NonBillboardPoints[4] =
-            // {
-            //     float4(-0.5, -0.5, 0, 1),
-            //     float4(-0.5, +0.5, 0, 1),
-            //     float4(+0.5, -0.5, 0, 1),
-            //     float4(+0.5, +0.5, 0, 1)
-            // };
+            static float4 NonBillboardPoints[4] =
+            {
+                float4(-0.5, -0.5, 0, 1),
+                float4(-0.5, +0.5, 0, 1),
+                float4(+0.5, -0.5, 0, 1),
+                float4(+0.5, +0.5, 0, 1)
+            };
 
             float4x4 EulerRotation(float3 xyz)
             {
-                xyz /= DEG2RAD;
+                xyz *= DEG2RAD;
 
                 float3 c, s;
                 sincos(xyz, s, c);
@@ -187,10 +190,19 @@ Shader "Unlit/ParticleShader"
 
                 OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
                 int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
+                int rendType    = SimulationStateBuffer[id].SimSpace_RendType[1];
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;
                 float3 scale    = SimulationStateBuffer[id].Scale;
                 
+                float4x4 localTS = float4x4
+                (
+                    scale.x,    0,          0,          pos.x,
+                    0,          scale.y,    0,          pos.y,
+                    0,          0,          scale.z,    pos.z,
+                    0,          0,          0,          1
+                );
+
                 /*
 
                     * DO THIS IN SEQUENCE *
@@ -199,6 +211,7 @@ Shader "Unlit/ParticleShader"
                         - Position is LocalPosition
                         - Rotation is LocalRotation
                         - Scale is LocalScale
+                        +
                         - Multiply all by Emitter's ObjectToWorld
 
                     if WORLD_SPACE:
@@ -211,41 +224,54 @@ Shader "Unlit/ParticleShader"
 
                 */
 
-                // TODO: Make Particle TRS
+                float4x4 transform;
 
-                float4x4 localTS = float4x4
-                (
-                    scale.x,    0,          0,          pos.x,
-                    0,          scale.y,    0,          pos.y,
-                    0,          0,          scale.z,    pos.z,
-                    0,          0,          0,          1
-                );
+                if(space == LOCAL_SPACE && rendType == RENDER_BILLBOARD)
+                // Local and Global transform without rotation
+                {
+                    transform = mul(ObjectToWorldNoRot, localTS);
+                }
+                else if(space == LOCAL_SPACE && rendType != RENDER_BILLBOARD)
+                // Local and global transform with rotation
+                {
+                    transform = mul(ObjectToWorld, mul(localTS, EulerRotation(rot)));
+                }
+                else if(space == GLOBAL_SPACE && rendType == RENDER_BILLBOARD)
+                // Local transform without rotation
+                {
+                    transform = localTS;
+                }
+                else // GLOBAL SPACE && !RENDER_BILLBOARD
+                // Local transform with rotation
+                {
+                    transform = mul(localTS, EulerRotation(rot));
+                }
 
-                // Local Space
-                if(space == LOCAL_SPACE)
+                // Billboard points used
+                if(rendType == RENDER_BILLBOARD)
                 {
                     [unroll]
                     for(int i = 0; i < 4; i++)
                     {
-                        float4 posWS = mul(ObjectToWorld, mul(localTS, mul(EulerRotation(rot), BillboardPoints[i]) ) );
+                        float4 posWS = mul(transform, BillboardPoints[i]);
                         OUT.PositionCS = UnityWorldToClipPos(posWS);
                         OUT.UV = UVs[i];
                         output.Append(OUT);
                     }
                 }
-                // World Space
+                // Non billboard points used
                 else
                 {
                     [unroll]
                     for(int i = 0; i < 4; i++)
                     {
-                        float4 posWS = mul(localTS, mul(EulerRotation(rot), BillboardPoints[i]));
+                        float4 posWS = mul(transform, NonBillboardPoints[i]);
                         OUT.PositionCS = UnityWorldToClipPos(posWS);
                         OUT.UV = UVs[i];
                         output.Append(OUT);
                     }
                 }
-                
+
                 output.RestartStrip();
             }
 

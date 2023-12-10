@@ -97,12 +97,45 @@ cbuffer GlobalState
 RWStructuredBuffer<int>             CurrentParticleCountBuffer;
 RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
 
-float Hash(float3 p)
+/*
+    ##############################################################
+    ####################### RNG STUFF ############################
+    ##############################################################
+*/
+
+// Time + Seed => float rand(float, ID)
+float randTS(float x, int ID)
 {
-    float h = dot(p, float3(127.1, 311.7, 74.7));
-    return frac(sin(h) * 43758.5453123);
+    float2 uv = float2(x, Time);
+    uint hash = uint(uv.x * 43758.5453123 + uv.y * 76963.7543123 + float(Seed) + ID);
+    hash = (hash << 13) ^ hash;
+    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
+
+    float random01 = float(hash) / float(0x7fffffff);
+    return random01;
 }
 
+// Time + Seed => float3 rand(float3, ID)
+float3 randTS(float3 input, int ID)
+{
+    float3 uvw = input + float3(Time, Time * 1.618033988749895, float(Seed + ID));
+
+    // Combine uvw into a single hash
+    uint hash = uint(uvw.x * 43758.5453123 + uvw.y * 76963.7543123 + uvw.z * 47113.7413123);
+    hash = (hash << 13) ^ hash;
+    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
+
+    // Map the hash to a float3 in the range [0, 1)
+    float3 random03 = float3(
+        float(hash & 0xFFFF) / 65535.0f,
+        float((hash >> 16) & 0xFFFF) / 65535.0f,
+        float((hash >> 32) & 0xFFFF) / 65535.0f
+    );
+
+    return random03;
+}
+
+// float3 Gradient(float3)
 float3 GradientNoise(float3 p, float time)
 {
     p += float3(time, time * 0.5, time * 0.2);
@@ -115,62 +148,42 @@ float3 GradientNoise(float3 p, float time)
 
     return lerp(
         lerp(
-            lerp(Hash(i + float3(0, 0, 0)), Hash(i + float3(1, 0, 0)), u.x),
-            lerp(Hash(i + float3(0, 1, 0)), Hash(i + float3(1, 1, 0)), u.x),
+            lerp(randTS(i + float3(0, 0, 0), 1), randTS(i + float3(1, 0, 0), 1), u.x),
+            lerp(randTS(i + float3(0, 1, 0), 1), randTS(i + float3(1, 1, 0), 1), u.x),
             u.y),
         lerp(
-            lerp(Hash(i + float3(0, 0, 1)), Hash(i + float3(1, 0, 1)), u.x),
-            lerp(Hash(i + float3(0, 1, 1)), Hash(i + float3(1, 1, 1)), u.x),
+            lerp(randTS(i + float3(0, 0, 1), 1), randTS(i + float3(1, 0, 1), 1), u.x),
+            lerp(randTS(i + float3(0, 1, 1), 1), randTS(i + float3(1, 1, 1), 1), u.x),
             u.y),
         u.z
     );
 }
 
-float rand(float co)
+// RAND_VEC on unit sphere => modified: https://www.shadertoy.com/view/3djyWW
+const float PI = 3.141592653;
+#define FK(k) asuint(cos(k))^asuint(k)
+float hash(float2 uv)
 {
-    return frac(sin(co * (91.3458)) * 47453.5453);
+    int x = FK(uv.x);
+    int y = FK(uv.y);
+    return float((x * x + y) * (y * y - x) + x) / 2.14e9;
 }
 
-// Uses Time and Seed
-float randTS(float x)
+float3 randvec(float seed)
 {
-    float2 uv = float2(x, Time);
-    uint hash = uint(uv.x * 43758.5453123 + uv.y * 76963.7543123 + float(Seed));
-    hash = (hash << 13) ^ hash;
-    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
-
-    float random01 = float(hash) / float(0x7fffffff);
-    return random01;
+    float h1 = hash(float2(seed, seed));
+    float h2 = hash(float2(h1, seed));
+    float h3 = hash(float2(h2, seed));
+    return normalize(float3(h1, h2, h3));
 }
 
-float3 randTS(float3 input)
-{
-    float3 uvw = input + float3(Time, Time * 1.618033988749895, float(Seed));
 
-    // Combine uvw into a single hash
-    uint hash = uint(uvw.x * 43758.5453123 + uvw.y * 76963.7543123 + uvw.z * 47113.7413123);
-    hash = (hash << 13) ^ hash;
-    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
+/*
+    ##############################################################
+    ##################### COMPUTE STUFF ##########################
+    ##############################################################
+*/
 
-    // Map the hash to a float3 in the range [0, 1)
-    float3 random01 = float3(
-        float(hash & 0xFFFF) / float(0xFFFF),
-        float((hash >> 16) & 0xFFFF) / float(0xFFFF),
-        float((hash >> 32) & 0xFFFF) / float(0xFFFF)
-    );
-
-    return random01;
-}
-
-float ResetScalar(float minScalar, float maxScalar)
-{
-    
-}
-
-float3 ResetScalar(float3 minScalar, float3 maxScalar)
-{
-    
-}
 
 void ResetScale(uint ID)
 {
@@ -182,7 +195,7 @@ void ResetScale(uint ID)
     {
         float3 prev = SimulationStateBuffer[ID].Scale;
         float3 diff = TopScale - BottomScale;
-        float3 rand = UniformScale ? randTS(prev.x) : randTS(prev);
+        float3 rand = UniformScale ? randTS(prev.x, ID) : randTS(prev, ID);
         SimulationStateBuffer[ID].Scale = BottomScale + diff * rand;
     }
     else
@@ -193,8 +206,25 @@ void ResetScale(uint ID)
 
 void ResetPosition(uint ID)
 {
-                                                                      /* Zero if SimulationSpace == Local */
-    SimulationStateBuffer[ID].Position          = ID + CenterOffset + (SimulationSpace * EmitterPositionWS);
+    float3 prev = SimulationStateBuffer[ID].Position;
+                                        /* Zero if SimulationSpace == Local */
+    float3 newPosition = CenterOffset + (SimulationSpace * EmitterPositionWS);
+
+    if(PositionFunctionType == FUNCTION_POINT)
+    {
+        /* NOP */
+    }
+    else if(PositionFunctionType == FUNCTION_SPHERE)
+    {
+                       /* Offset From Middle of sphere at [0-Radius] */
+        newPosition += randvec(hash(randTS(prev, ID).xy)) * Radius * randTS(prev.x, ID);
+    }
+    else
+    {
+        // TODO
+    }
+    
+    SimulationStateBuffer[ID].Position = newPosition;
 }
 
 void ResetRotation(uint ID)
@@ -205,7 +235,10 @@ void ResetRotation(uint ID)
     }
     else if(RotationScalarType == SCALAR_RANGED)
     {
-        
+        float3 prev = SimulationStateBuffer[ID].Rotation;
+        float3 diff = TopRotation - BottomRotation;
+        float3 rand = UniformScale ? randTS(prev.x, ID) : randTS(prev, ID);
+        SimulationStateBuffer[ID].Rotation = BottomRotation + diff * rand;
     }
     else
     {

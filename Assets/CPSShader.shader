@@ -223,6 +223,7 @@ Shader "Unlit/ParticleShader"
                         - Override Rotation
 
                 */
+                // TODO FIX: Emitter rotation should be included in billboarding (moving center point before GeometryShader)
 
                 float4x4 transform;
 

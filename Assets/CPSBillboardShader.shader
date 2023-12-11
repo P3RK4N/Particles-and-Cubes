@@ -2,7 +2,7 @@ Shader "Unlit/CPSBillboardShader"
 {
     Properties
     {
-        _MainTex("Texture", 2D) = "white" {}
+        _BillboardTexture("Texture", 2D) = "white" {}
     }
     SubShader
     {
@@ -127,8 +127,8 @@ Shader "Unlit/CPSBillboardShader"
                 float2 UV           : TEXCOORD1;
             };
 
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
+            sampler2D _BillboardTexture;
+            float4 _BillboardTexture_ST;
 
             CBUFFER_START(UnityPerMaterial)
                 float4x4    ObjectToWorld;
@@ -206,7 +206,6 @@ Shader "Unlit/CPSBillboardShader"
 
                 OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
                 int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
-                int rendType    = SimulationStateBuffer[id].SimSpace_RendType[1];
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;
                 float3 scale    = SimulationStateBuffer[id].Scale;
@@ -241,7 +240,7 @@ Shader "Unlit/CPSBillboardShader"
 
             half4 frag (FRAG_IN IN) : SV_Target
             {
-                half4 texCol = tex2D(_MainTex, IN.UV);
+                half4 texCol = tex2D(_BillboardTexture, IN.UV);
                 if(texCol.a < 0.6) discard;
                 return IN.Colour * texCol;
             }

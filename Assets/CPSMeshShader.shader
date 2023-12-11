@@ -2,7 +2,7 @@ Shader "Unlit/CPSMeshShader"
 {
     Properties
     {
-        _MainTex("Texture", 2D) = "white" {}
+        _BillboardTexture("Texture", 2D) = "white" {}
     }
     SubShader
     {
@@ -17,12 +17,9 @@ Shader "Unlit/CPSMeshShader"
             #pragma target 5.0
 
             #pragma vertex vert
-            #pragma geometry geom
             #pragma fragment frag
 
             #include "UnityCG.cginc"
-            #define UNITY_INDIRECT_DRAW_ARGS IndirectDrawArgs
-            #include "UnityIndirect.cginc"
 
             static const int LOCAL_SPACE        = 0;
             static const int GLOBAL_SPACE       = 1;
@@ -45,7 +42,6 @@ Shader "Unlit/CPSMeshShader"
             static const int FALLOFF_QUADRATIC  = 2;
             static const int FALLOFF_CUBOID     = 3;
 
-            #define DEG2RAD (3.1415926535897932384626433832795 / 180.0)
 
             struct SimulationState
             {
@@ -78,6 +74,7 @@ Shader "Unlit/CPSMeshShader"
 
                 // Environment Stuff
                 float3 EmitterPositionWS;
+
                 float GravityForce;
     
                 // TODO: Expand existing ones
@@ -115,27 +112,32 @@ Shader "Unlit/CPSMeshShader"
                 // TODO: Expand new ones
             };
 
-            struct GEOM_IN
+            struct VERT_IN
             {
-                uint ID           : TEXCOORD0;
+                float4 PositionOS   : POSITION;
+                float2 UV           : TEXCOORD0;
+                float3 Normal       : NORMAL0;
             };
 
             struct FRAG_IN
             {
-                float4 PositionCS   : SV_POSITION;
-                half4  Colour       : COLOR;
-                float2 UV           : TEXCOORD1;
+                nointerpolation int Drop : TEXCOORD2;
+                float4 PositionCS        : SV_POSITION;
+                half4  Colour            : COLOR;
+                float2 UV                : TEXCOORD1;
+                float3 Normal            : NORMAL1;
+                float3 PositionWS        : TEXCOORD3;
             };
 
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
-
+            sampler2D _BillboardTexture;
+            float4 _BillboardTexture_ST;
 
             CBUFFER_START(UnityPerMaterial)
-                float4      BillboardPoints[4];
                 float4x4    ObjectToWorld;
-                float4x4    ObjectToWorldNoRot;
             CBUFFER_END
+
+#ifndef CPS_HELPERS
+#define CPS_HELPERS
 
             static float2 UVs[4] =
             {
@@ -145,16 +147,25 @@ Shader "Unlit/CPSMeshShader"
                 float2(1, 1)
             };
 
-            static float4 NonBillboardPoints[4] =
+            static int2 BillboardMultipliers[4] =
             {
-                float4(-0.5, -0.5, 0, 1),
-                float4(-0.5, +0.5, 0, 1),
-                float4(+0.5, -0.5, 0, 1),
-                float4(+0.5, +0.5, 0, 1)
+                int2(-1, -1),
+                int2(-1, +1),
+                int2(+1, -1),
+                int2(+1, +1)
             };
+
+            static float4x4 Identity = float4x4
+            (
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            );
 
             float4x4 EulerRotation(float3 xyz)
             {
+                #define DEG2RAD (3.1415926535897932384626433832795 / 180.0)
                 xyz *= DEG2RAD;
 
                 float3 c, s;
@@ -172,115 +183,70 @@ Shader "Unlit/CPSMeshShader"
                 );
             }
 
-            GEOM_IN vert (uint VertexID : SV_VertexID)
+            float3 CameraRight()
             {
-                InitIndirectDrawArgs(0); 
-                GEOM_IN OUT = (GEOM_IN)0;
-                OUT.ID = GetIndirectVertexID(VertexID);
-                return OUT;
+                return mul((float3x3)unity_CameraToWorld, float3(0.5,0,0));
             }
 
-            [maxvertexcount(4)]
-            void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
+            float3 CameraUp()
+            {
+                return mul((float3x3)unity_CameraToWorld, float3(0,0.5,0));
+            }
+
+#endif // CPS_HELPERS
+
+
+            FRAG_IN vert (VERT_IN IN, uint InstanceID: SV_InstanceID)
             {
                 FRAG_IN OUT = (FRAG_IN)0;
+                OUT.Drop = 0;
 
-                uint id = input[0].ID;
-                if(SimulationStateBuffer[id].Current_Max_Life.x <= 0) { return; }
+                if(SimulationStateBuffer[InstanceID].Current_Max_Life.x <= 0)
+                {
+                    OUT.Drop = 1;
+                    return OUT;
+                }
 
-                OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
-                int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
-                int rendType    = SimulationStateBuffer[id].SimSpace_RendType[1];
-                float3 pos      = SimulationStateBuffer[id].Position;
-                float3 rot      = SimulationStateBuffer[id].Rotation;
-                float3 scale    = SimulationStateBuffer[id].Scale;
+                int space       = SimulationStateBuffer[InstanceID].SimSpace_RendType[0];
+                float3 pos      = SimulationStateBuffer[InstanceID].Position;
+                float3 rot      = SimulationStateBuffer[InstanceID].Rotation;
+                float3 scale    = SimulationStateBuffer[InstanceID].Scale;
+
+                // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
+                // transform their positions? Stretching doesnt seem right (eg. Particles at the extreme positions will have
+                // vastly different scale compared to the ones in the center of local space)
+                // FOR NOW: They just transform via Emitter position when in LOCAL_SPACE
                 
-                float4x4 localTS = float4x4
+                float4x4 ToObject = float4x4
                 (
-                    scale.x,    0,          0,          pos.x,
-                    0,          scale.y,    0,          pos.y,
-                    0,          0,          scale.z,    pos.z,
+                    scale.x,    0,          0,          0,
+                    0,          scale.y,    0,          0,
+                    0,          0,          scale.z,    0,
                     0,          0,          0,          1
                 );
 
-                /*
+                float4 offsetOS = mul(ToObject, mul(EulerRotation(rot), IN.PositionOS));
+                float4 offsetWS = mul(space == LOCAL_SPACE ? ObjectToWorld : Identity, float4(pos, 1));
 
-                    * DO THIS IN SEQUENCE *
+                float4 positionWS = offsetWS + offsetOS;
+                positionWS.w = 1;
 
-                    if LOCAL_SPACE:
-                        - Position is LocalPosition
-                        - Rotation is LocalRotation
-                        - Scale is LocalScale
-                        +
-                        - Multiply all by Emitter's ObjectToWorld
+                OUT.PositionCS  = UnityWorldToClipPos(positionWS);
+                OUT.UV          = IN.UV;
+                OUT.Colour      = half4(SimulationStateBuffer[InstanceID].Colour, 1);
+                OUT.Normal      = IN.Normal;
+                OUT.PositionWS  = positionWS.xyz;
 
-                    if WORLD_SPACE:
-                        - Start Position is EmitterPosition + OffsetWS
-                        - Rotation is Rotation (We do not want to add to EmitterRotation)
-                        - Scale is Scale (We do not want to multiply with EmitterScale)
-
-                    if BILLBOARD:
-                        - Override Rotation
-
-                */
-                // TODO FIX: Emitter rotation should be included in billboarding (moving center point before GeometryShader)
-
-                float4x4 transform;
-
-                if(space == LOCAL_SPACE && rendType == RENDER_BILLBOARD)
-                // Local and Global transform without rotation
-                {
-                    transform = mul(ObjectToWorldNoRot, localTS);
-                }
-                else if(space == LOCAL_SPACE && rendType != RENDER_BILLBOARD)
-                // Local and global transform with rotation
-                {
-                    transform = mul(ObjectToWorld, mul(localTS, EulerRotation(rot)));
-                }
-                else if(space == GLOBAL_SPACE && rendType == RENDER_BILLBOARD)
-                // Local transform without rotation
-                {
-                    transform = localTS;
-                }
-                else // GLOBAL SPACE && !RENDER_BILLBOARD
-                // Local transform with rotation
-                {
-                    transform = mul(localTS, EulerRotation(rot));
-                }
-
-                // Billboard points used
-                if(rendType == RENDER_BILLBOARD)
-                {
-                    [unroll]
-                    for(int i = 0; i < 4; i++)
-                    {
-                        float4 posWS = mul(transform, BillboardPoints[i]);
-                        OUT.PositionCS = UnityWorldToClipPos(posWS);
-                        OUT.UV = UVs[i];
-                        output.Append(OUT);
-                    }
-                }
-                // Non billboard points used
-                else
-                {
-                    [unroll]
-                    for(int i = 0; i < 4; i++)
-                    {
-                        float4 posWS = mul(transform, NonBillboardPoints[i]);
-                        OUT.PositionCS = UnityWorldToClipPos(posWS);
-                        OUT.UV = UVs[i];
-                        output.Append(OUT);
-                    }
-                }
-
-                output.RestartStrip();
+                return OUT;
             }
 
             half4 frag (FRAG_IN IN) : SV_Target
             {
-                half4 texCol = tex2D(_MainTex, IN.UV);
-                if(texCol.a < 0.6) discard;
-                return IN.Colour * texCol;
+                if(IN.Drop) discard;
+
+                float3 lightDir = UnityWorldSpaceLightDir(IN.PositionWS);
+                float val = dot(lightDir, IN.Normal) * 0.5 + 0.5;
+                return half4(val,val,val,1) * IN.Colour;
             }
             
             ENDCG

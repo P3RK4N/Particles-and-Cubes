@@ -97,6 +97,8 @@ cbuffer GlobalState
 RWStructuredBuffer<int>             CurrentParticleCountBuffer;
 RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
 
+// TODO: Fix PRNG functions
+
 /*
     ##############################################################
     ####################### RNG STUFF ############################

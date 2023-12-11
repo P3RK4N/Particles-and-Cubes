@@ -115,22 +115,22 @@ public class CPS : MonoBehaviour
 
 #endregion 
 
-#region Script Fields
+#region Template Fields
 
     /// <summary>
-    /// Template of shader which will simulate particles
+    /// Compute shader which will simulate particles
     /// </summary>
     [SerializeField] public ComputeShader SimulatorTemplate;
 
     /// <summary>
     /// Material for rendering points and billboards
     /// </summary>
-    [SerializeField] public Material BillboardMaterial;
+    [SerializeField] public Material BillboardMaterialTemplate;
 
     /// <summary>
     /// Material for rendering meshes
     /// </summary>
-    [SerializeField] public Material MeshMaterial;
+    [SerializeField] public Material MeshMaterialTemplate;
 
 #endregion
 
@@ -155,6 +155,20 @@ public class CPS : MonoBehaviour
     /// Whether to draw helper gui
     /// </summary>
     [SerializeField] public bool                        DrawGUI;
+
+    #endregion
+
+#region Render Stuff
+
+    /// <summary>
+    /// Texture used for billboard particles
+    /// </summary>
+    [SerializeField] public Texture2D                   BillboardTexture;
+
+    /// <summary>
+    /// Mesh used for non billboard particles
+    /// </summary>
+    [SerializeField] public Mesh                        ParticleMesh;
 
 #endregion
 
@@ -189,9 +203,29 @@ public class CPS : MonoBehaviour
 
 #region SimulationFields
 
-    [SerializeField] public int MaximumParticleCount; public int CurrentParticleCount;
-    [SerializeField] public int EmissionRate;         public float EmissionAmount;
+    /// <summary>
+    /// Max count of concurrent particles
+    /// </summary>
+    [SerializeField] public int                         MaximumParticleCount;
+    
+    /// <summary>
+    /// Used for tracking current number of concurrent particles
+    /// </summary>
+    public int                                          CurrentParticleCount;
 
+    /// <summary>
+    /// Amount of particles emitted per second
+    /// </summary>
+    [SerializeField] public int                         EmissionRate;
+    
+    /// <summary>
+    /// Tracks emission amount for current frame
+    /// </summary>
+    public float                                        EmissionAmount;
+
+    /// <summary>
+    /// Whether to use gravity
+    /// </summary>
     [SerializeField] public bool UseGravity;
 
     /// <summary>
@@ -199,15 +233,9 @@ public class CPS : MonoBehaviour
     /// </summary>
     [SerializeField] public List<ForceFieldDescriptor> ForceFields;
 
-    #endregion
-
-#region Other
-
-    [SerializeField] public Texture2D                   MainTexture;
-
 #endregion
 
-    public static CPS           Singleton;
+
     public static readonly int  HARD_LIMIT = 32 * 32 * 32 * 32 - 1;
     public static int           GlobalStateSizeInFloat = 51;
 
@@ -223,7 +251,7 @@ public class CPS : MonoBehaviour
     RenderParams                MeshRenderParams;
 
     /// <summary>
-    /// Defines number of vertices and instances per graphics buffer 
+    /// Defines number of vertices and instances drawn in billboard render mode
     /// </summary>
     GraphicsBuffer              BillboardCommandBuffer;
 
@@ -256,11 +284,10 @@ public class CPS : MonoBehaviour
 
     void Awake()
     {
-        if(Singleton == null) Singleton = this;
-
         Debug.Assert(SimulatorTemplate != null, "SimulatorTemplate should not be null!");
 
         tf = transform;
+        ParticleMesh = ParticleMesh == null ? Resources.GetBuiltinResource<Mesh>("Cube.fbx") : ParticleMesh;
 
         CreateBuffers();
         InitializeCompute();
@@ -275,13 +302,11 @@ public class CPS : MonoBehaviour
 
     void OnDestroy()
     {
-        if(this == Singleton) Singleton = null;
         DeleteBuffers();
     }
     
     void Update()
     {
-        if(this == Singleton) UpdateGlobalShaderVariables();
         UpdateLocalShaderVariables();
         SynchronizeCounters();
 
@@ -298,7 +323,7 @@ public class CPS : MonoBehaviour
         }
         else // ParticleRenderType.Mesh
         {
-            // TODO:
+            Graphics.RenderMeshPrimitives(MeshRenderParams, ParticleMesh, 0, MaximumParticleCount);
         }
     }
 
@@ -395,40 +420,14 @@ public class CPS : MonoBehaviour
         Simulator.SetFloat  ( "DeltaTime",         Time.deltaTime );
         Simulator.SetFloat  ( "Time",              Time.time      );
 
-        // TODO: Handle Mesh render params
         if(RenderType == ParticleRenderType.Billboard || RenderType == ParticleRenderType.Point)
         {
-            BillboardRenderParams.matProps.SetMatrix( "ObjectToWorld",      tf.localToWorldMatrix                                         );
-            BillboardRenderParams.matProps.SetMatrix( "ObjectToWorldNoRot", Matrix4x4.TRS(tf.position, Quaternion.identity, tf.lossyScale ));
+            BillboardRenderParams.matProps  .SetMatrix("ObjectToWorld", tf.localToWorldMatrix);
         }
         else // ParticleRenderType.Mesh
         {
-            // TODO
+            MeshRenderParams.matProps       .SetMatrix("ObjectToWorld", tf.localToWorldMatrix);
         }
-    }
-
-    void UpdateGlobalShaderVariables()
-    {
-        // TODO: Consider unique prefix for global vars
-        UpdateBillboardPoints();
-    }
-
-    void UpdateBillboardPoints()
-    {
-        var rot = Matrix4x4.Rotate(Camera.main.transform.rotation);
-        
-        Vector4[] billboardPoints = new Vector4[]
-        {
-            rot * (- Vector3.right - Vector3.up),
-            rot * (- Vector3.right + Vector3.up),
-            rot * (  Vector3.right - Vector3.up),
-            rot * (  Vector3.right + Vector3.up)
-        };
-
-        for(int i = 0; i < 4; i++) billboardPoints[i].w = 1.0f;
-
-        Shader.SetGlobalVectorArray("BillboardPoints", billboardPoints);
-        //renderParams.matProps.SetVectorArray("ObjectPoints", objectPoints);
     }
 
     void CreateBuffers()
@@ -459,26 +458,29 @@ public class CPS : MonoBehaviour
         );
 
         // Counters && CopyCount buffer
-        EmissionAmountCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
-        CurrentParticleCountBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
-        EmissionAmountCounterBuffer.SetCounterValue(0);
-        CurrentParticleCountBuffer.SetCounterValue(0);
-        CopyCounterBuffer = new ComputeBuffer(1, 4, ComputeBufferType.Raw);
+        EmissionAmountCounterBuffer  = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
+        CurrentParticleCountBuffer   = new ComputeBuffer(1, 4, ComputeBufferType.Counter);
+        EmissionAmountCounterBuffer  .SetCounterValue(0);
+        CurrentParticleCountBuffer   .SetCounterValue(0);
+        CopyCounterBuffer            = new ComputeBuffer(1, 4, ComputeBufferType.Raw);
 
-        // Command Buffer
-        // TODO: Need Billboard and Mesh CommandBuffer
-        BillboardCommandBuffer = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
-        BillboardCommandBuffer.SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs{ vertexCountPerInstance = (uint)MaximumParticleCount, instanceCount = 1 } });
+        // Billboard command buffer
+        BillboardCommandBuffer       = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
+        BillboardCommandBuffer       .SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs
+        {
+            vertexCountPerInstance   = (uint)MaximumParticleCount,
+            instanceCount            = 1
+        }});
     }
 
     void DeleteBuffers()
     {
-        SimulationStateBuffer?.Release();
-        GlobalStateBuffer?.Release();
-        BillboardCommandBuffer?.Release();
-        CurrentParticleCountBuffer?.Release();
-        EmissionAmountCounterBuffer?.Release();
-        CopyCounterBuffer?.Release();
+        SimulationStateBuffer       ?.Release();
+        GlobalStateBuffer           ?.Release();
+        BillboardCommandBuffer      ?.Release();
+        CurrentParticleCountBuffer  ?.Release();
+        EmissionAmountCounterBuffer ?.Release();
+        CopyCounterBuffer           ?.Release();
     }
 
     void InitializeCompute()
@@ -496,19 +498,20 @@ public class CPS : MonoBehaviour
 
     void InitializeRenderContext()
     {
-        BillboardRenderParams                     = new RenderParams(Instantiate(BillboardMaterial));
-        BillboardRenderParams.worldBounds         = new Bounds(Vector3.zero, 10000*Vector3.one);
-        BillboardRenderParams.matProps            = new MaterialPropertyBlock();
-        BillboardRenderParams.matProps.SetBuffer  ("SimulationStateBuffer", SimulationStateBuffer );
-        BillboardRenderParams.matProps.SetBuffer  ("GlobalStateBuffer",     GlobalStateBuffer     );
-        BillboardRenderParams.matProps.SetTexture ("_MainTex",              MainTexture           );
+        BillboardRenderParams                      = new RenderParams(Instantiate(BillboardMaterialTemplate));
+        BillboardRenderParams.worldBounds          = new Bounds(Vector3.zero, 10000*Vector3.one);
+        BillboardRenderParams.matProps             = new MaterialPropertyBlock();
+        BillboardRenderParams.matProps.SetBuffer   ("SimulationStateBuffer", SimulationStateBuffer );
+        BillboardRenderParams.matProps.SetBuffer   ("GlobalStateBuffer",     GlobalStateBuffer     );
+        BillboardRenderParams.matProps.SetTexture  ("_BillboardTexture",     BillboardTexture      );
         
-        MeshRenderParams                          = new RenderParams(Instantiate(MeshMaterial));
-        MeshRenderParams.worldBounds              = new Bounds(Vector3.zero, 10000*Vector3.one);
-        MeshRenderParams.matProps                 = new MaterialPropertyBlock();
-        MeshRenderParams.matProps.SetBuffer       ("SimulationStateBuffer", SimulationStateBuffer );
-        MeshRenderParams.matProps.SetBuffer       ("GlobalStateBuffer",     GlobalStateBuffer     );
-        MeshRenderParams.matProps.SetTexture      ("_MainTex",              MainTexture           );
+        MeshRenderParams                           = new RenderParams(Instantiate(MeshMaterialTemplate));
+        MeshRenderParams.worldBounds               = new Bounds(Vector3.zero, 10000*Vector3.one);
+        MeshRenderParams.material.enableInstancing = true;
+        MeshRenderParams.matProps                  = new MaterialPropertyBlock();
+        MeshRenderParams.matProps.SetBuffer        ("SimulationStateBuffer", SimulationStateBuffer );
+        MeshRenderParams.matProps.SetBuffer        ("GlobalStateBuffer",     GlobalStateBuffer     );
+        MeshRenderParams.matProps.SetTexture       ("_BillboardTexture",     BillboardTexture      );
     }
 
     int _dispatchNum = -1;
@@ -526,6 +529,7 @@ public class CPS : MonoBehaviour
         }
         throw new Exception("Not happening!");
     }
+    
     void DrawStartPosition()
     {
         switch(StartPositionGenerator.Type)
@@ -897,14 +901,18 @@ public class CPSEditor : Editor
 
     // Script properties
     SerializedProperty  _SimulatorTemplate;
-    SerializedProperty  _BillboardMaterial;
-    SerializedProperty  _MeshMaterial;
+    SerializedProperty  _BillboardMaterialTemplate;
+    SerializedProperty  _MeshMaterialTemplate;
 
     // Setting properties
     SerializedProperty  _Seed;
     SerializedProperty  _SimulationSpace;
     SerializedProperty  _RenderType;
     SerializedProperty  _DrawGUI;
+
+    // Render stuff
+    SerializedProperty _BillboardTexture;
+    SerializedProperty _ParticleMesh;
 
     // Start properties
     SerializedProperty  _StartVelocityGenerator;
@@ -918,48 +926,46 @@ public class CPSEditor : Editor
     SerializedProperty _EmissionRate;
     SerializedProperty _UseGravity;
 
-    // Other
-    SerializedProperty _MainTexture;
-
     void OnEnable()
     {
         // NOTE: Can be automatized with reflection
 
         _CPS = new SerializedObject(target);
 
-        _SimulatorTemplate      = _CPS.FindProperty("SimulatorTemplate");
-        _BillboardMaterial      = _CPS.FindProperty("BillboardMaterial");
-        _MeshMaterial           = _CPS.FindProperty("MeshMaterial");
+        _SimulatorTemplate          = _CPS.FindProperty("SimulatorTemplate");
+        _BillboardMaterialTemplate  = _CPS.FindProperty("BillboardMaterialTemplate");
+        _MeshMaterialTemplate       = _CPS.FindProperty("MeshMaterialTemplate");
 
-        _Seed                   = _CPS.FindProperty("Seed");
-        _SimulationSpace        = _CPS.FindProperty("SimulationSpace");
-        _RenderType             = _CPS.FindProperty("RenderType");
-        _DrawGUI                = _CPS.FindProperty("DrawGUI");
+        _Seed                       = _CPS.FindProperty("Seed");
+        _SimulationSpace            = _CPS.FindProperty("SimulationSpace");
+        _RenderType                 = _CPS.FindProperty("RenderType");
+        _DrawGUI                    = _CPS.FindProperty("DrawGUI");
 
-        _StartVelocityGenerator = _CPS.FindProperty("StartVelocityGenerator");
-        _StartScaleGenerator    = _CPS.FindProperty("StartScaleGenerator");
-        _StartRotationGenerator = _CPS.FindProperty("StartRotationGenerator");
-        _StartLifetimeGenerator = _CPS.FindProperty("StartLifetimeGenerator");
-        _StartPositionGenerator = _CPS.FindProperty("StartPositionGenerator");
+        _BillboardTexture           = _CPS.FindProperty("BillboardTexture");
+        _ParticleMesh               = _CPS.FindProperty("ParticleMesh");
 
-        _MaximumParticleCount   = _CPS.FindProperty("MaximumParticleCount");
-        _EmissionRate           = _CPS.FindProperty("EmissionRate");
-        _UseGravity             = _CPS.FindProperty("UseGravity");
+        _StartVelocityGenerator     = _CPS.FindProperty("StartVelocityGenerator");
+        _StartScaleGenerator        = _CPS.FindProperty("StartScaleGenerator");
+        _StartRotationGenerator     = _CPS.FindProperty("StartRotationGenerator");
+        _StartLifetimeGenerator     = _CPS.FindProperty("StartLifetimeGenerator");
+        _StartPositionGenerator     = _CPS.FindProperty("StartPositionGenerator");
 
-        _MainTexture            = _CPS.FindProperty("MainTexture");
+        _MaximumParticleCount       = _CPS.FindProperty("MaximumParticleCount");
+        _EmissionRate               = _CPS.FindProperty("EmissionRate");
+        _UseGravity                 = _CPS.FindProperty("UseGravity");
     }
 
     CPS Target { get => target as CPS; }
 
-    void ScriptSubMenu()
+    void TemplatesMenu()
     { 
         EditorGUI.BeginDisabledGroup(true);
         EditorGUILayout.ObjectField("Script:", MonoScript.FromMonoBehaviour(target as CPS), typeof(CPS), true);
         EditorGUI.EndDisabledGroup();
 
-        EditorGUILayout.PropertyField(_SimulatorTemplate, true);
-        EditorGUILayout.PropertyField(_BillboardMaterial, true);
-        EditorGUILayout.PropertyField(_MeshMaterial,      true);
+        EditorGUILayout.PropertyField(_SimulatorTemplate,         true);
+        EditorGUILayout.PropertyField(_BillboardMaterialTemplate, true);
+        EditorGUILayout.PropertyField(_MeshMaterialTemplate,      true);
     }
 
     void SettingsSubMenu()
@@ -967,6 +973,19 @@ public class CPSEditor : Editor
         EditorGUILayout.PropertyField(_Seed,            true);
         EditorGUILayout.PropertyField(_SimulationSpace, true);
         EditorGUILayout.PropertyField(_RenderType,      true);
+
+        Indented(() =>
+        {
+            if((CPS.ParticleRenderType)_RenderType.enumValueIndex == CPS.ParticleRenderType.Mesh)
+            {
+                EditorGUILayout.PropertyField(_ParticleMesh);
+            }
+            else
+            {
+                EditorGUILayout.PropertyField(_BillboardTexture);
+            }
+        });
+
         EditorGUILayout.PropertyField(_DrawGUI,         true);
     }
 
@@ -1006,15 +1025,13 @@ public class CPSEditor : Editor
         _CPS.Update();
 
 
-        SubMenuContext(ScriptSubMenu,       "Scripts",      ScriptsColor);
+        SubMenuContext(TemplatesMenu,       "Templates",    ScriptsColor);
         EditorGUILayout.Space();
         SubMenuContext(SettingsSubMenu,     "Settings",     SettingsColor);
         EditorGUILayout.Space();
         SubMenuContext(StartSubMenu,        "Start",        StartColor);   
         EditorGUILayout.Space();
         SubMenuContext(SimulationSubMenu,   "Simulation",   SimulationColor);   
-
-        EditorGUILayout.PropertyField(_MainTexture);
 
         _CPS.ApplyModifiedProperties();
     }

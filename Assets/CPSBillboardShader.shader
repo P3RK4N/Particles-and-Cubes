@@ -1,4 +1,4 @@
-Shader "Unlit/ParticleShader"
+Shader "Unlit/CPSBillboardShader"
 {
     Properties
     {
@@ -45,7 +45,6 @@ Shader "Unlit/ParticleShader"
             static const int FALLOFF_QUADRATIC  = 2;
             static const int FALLOFF_CUBOID     = 3;
 
-            #define DEG2RAD (3.1415926535897932384626433832795 / 180.0)
 
             struct SimulationState
             {
@@ -78,6 +77,7 @@ Shader "Unlit/ParticleShader"
 
                 // Environment Stuff
                 float3 EmitterPositionWS;
+
                 float GravityForce;
     
                 // TODO: Expand existing ones
@@ -130,20 +130,9 @@ Shader "Unlit/ParticleShader"
             sampler2D _MainTex;
             float4 _MainTex_ST;
 
-
             CBUFFER_START(UnityPerMaterial)
-                float4      BillboardPoints[4];
                 float4x4    ObjectToWorld;
-                float4x4    ObjectToWorldNoRot;
             CBUFFER_END
-
-            GEOM_IN vert (uint VertexID : SV_VertexID)
-            {
-                InitIndirectDrawArgs(0); 
-                GEOM_IN OUT = (GEOM_IN)0;
-                OUT.ID = GetIndirectVertexID(VertexID);
-                return OUT;
-            }
 
             static float2 UVs[4] =
             {
@@ -153,16 +142,25 @@ Shader "Unlit/ParticleShader"
                 float2(1, 1)
             };
 
-            static float4 NonBillboardPoints[4] =
+            static int2 BillboardMultipliers[4] =
             {
-                float4(-0.5, -0.5, 0, 1),
-                float4(-0.5, +0.5, 0, 1),
-                float4(+0.5, -0.5, 0, 1),
-                float4(+0.5, +0.5, 0, 1)
+                int2(-1, -1),
+                int2(-1, +1),
+                int2(+1, -1),
+                int2(+1, +1)
             };
+
+            static float4x4 Identity = float4x4
+            (
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            );
 
             float4x4 EulerRotation(float3 xyz)
             {
+                #define DEG2RAD (3.1415926535897932384626433832795 / 180.0)
                 xyz *= DEG2RAD;
 
                 float3 c, s;
@@ -180,6 +178,24 @@ Shader "Unlit/ParticleShader"
                 );
             }
 
+            float3 CameraRight()
+            {
+                return mul((float3x3)unity_CameraToWorld, float3(0.5,0,0));
+            }
+
+            float3 CameraUp()
+            {
+                return mul((float3x3)unity_CameraToWorld, float3(0,0.5,0));
+            }
+
+            GEOM_IN vert (uint VertexID : SV_VertexID)
+            {
+                InitIndirectDrawArgs(0); 
+                GEOM_IN OUT = (GEOM_IN)0;
+                OUT.ID = GetIndirectVertexID(VertexID);
+                return OUT;
+            }
+
             [maxvertexcount(4)]
             void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
             {
@@ -195,82 +211,29 @@ Shader "Unlit/ParticleShader"
                 float3 rot      = SimulationStateBuffer[id].Rotation;
                 float3 scale    = SimulationStateBuffer[id].Scale;
                 
-                float4x4 localTS = float4x4
-                (
-                    scale.x,    0,          0,          pos.x,
-                    0,          scale.y,    0,          pos.y,
-                    0,          0,          scale.z,    pos.z,
-                    0,          0,          0,          1
-                );
+                // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
+                // transform their positions? Stretching doesnt seem right (eg. Particles at the extreme positions will have
+                // vastly different scale compared to the ones in the center of local space)
+                // FOR NOW: They just transform via Emitter position when in LOCAL_SPACE
 
-                /*
+                float4 positionWS = mul(space == LOCAL_SPACE ? ObjectToWorld : Identity, float4(pos, 1));
 
-                    * DO THIS IN SEQUENCE *
+                float3 camX = CameraRight();
+                float3 camY = CameraUp();
 
-                    if LOCAL_SPACE:
-                        - Position is LocalPosition
-                        - Rotation is LocalRotation
-                        - Scale is LocalScale
-                        +
-                        - Multiply all by Emitter's ObjectToWorld
-
-                    if WORLD_SPACE:
-                        - Start Position is EmitterPosition + OffsetWS
-                        - Rotation is Rotation (We do not want to add to EmitterRotation)
-                        - Scale is Scale (We do not want to multiply with EmitterScale)
-
-                    if BILLBOARD:
-                        - Override Rotation
-
-                */
-                // TODO FIX: Emitter rotation should be included in billboarding (moving center point before GeometryShader)
-
-                float4x4 transform;
-
-                if(space == LOCAL_SPACE && rendType == RENDER_BILLBOARD)
-                // Local and Global transform without rotation
+                [unroll]
+                for(int i = 0; i < 4; i++)
                 {
-                    transform = mul(ObjectToWorldNoRot, localTS);
-                }
-                else if(space == LOCAL_SPACE && rendType != RENDER_BILLBOARD)
-                // Local and global transform with rotation
-                {
-                    transform = mul(ObjectToWorld, mul(localTS, EulerRotation(rot)));
-                }
-                else if(space == GLOBAL_SPACE && rendType == RENDER_BILLBOARD)
-                // Local transform without rotation
-                {
-                    transform = localTS;
-                }
-                else // GLOBAL SPACE && !RENDER_BILLBOARD
-                // Local transform with rotation
-                {
-                    transform = mul(localTS, EulerRotation(rot));
-                }
-
-                // Billboard points used
-                if(rendType == RENDER_BILLBOARD)
-                {
-                    [unroll]
-                    for(int i = 0; i < 4; i++)
-                    {
-                        float4 posWS = mul(transform, BillboardPoints[i]);
-                        OUT.PositionCS = UnityWorldToClipPos(posWS);
-                        OUT.UV = UVs[i];
-                        output.Append(OUT);
-                    }
-                }
-                // Non billboard points used
-                else
-                {
-                    [unroll]
-                    for(int i = 0; i < 4; i++)
-                    {
-                        float4 posWS = mul(transform, NonBillboardPoints[i]);
-                        OUT.PositionCS = UnityWorldToClipPos(posWS);
-                        OUT.UV = UVs[i];
-                        output.Append(OUT);
-                    }
+                    float4 billboardPoint = float4
+                    (
+                        positionWS + 
+                        scale.x * camX * BillboardMultipliers[i].x +
+                        scale.y * camY * BillboardMultipliers[i].y,
+                        1
+                    );
+                    OUT.PositionCS = UnityWorldToClipPos(billboardPoint);
+                    OUT.UV = UVs[i];
+                    output.Append(OUT);
                 }
 
                 output.RestartStrip();

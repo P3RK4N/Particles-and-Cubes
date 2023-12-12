@@ -236,8 +236,8 @@ public class CPS : MonoBehaviour
 #endregion
 
 
-    public static readonly int  HARD_LIMIT = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat = 51;
+    public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
+    public static int           GlobalStateSizeInFloat  = 51;
 
     /// <summary>
     /// CPSSimulator instance

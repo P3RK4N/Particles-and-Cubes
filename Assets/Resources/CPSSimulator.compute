@@ -105,63 +105,173 @@ RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
     ##############################################################
 */
 
-// Time + Seed => float rand(float, ID)
-float randTS(float x, int ID)
-{
-    float2 uv = float2(x, Time);
-    uint hash = uint(uv.x * 43758.5453123 + uv.y * 76963.7543123 + float(Seed) + ID);
-    hash = (hash << 13) ^ hash;
-    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
+#ifndef SHADERTOY_HASH_FUNCTIONS
+#define SHADERTOY_HASH_FUNCTIONS
 
-    float random01 = float(hash) / float(0x7fffffff);
-    return random01;
+/*
+    Hash Functions for GPU Rendering
+    https://www.shadertoy.com/view/XlGcRh
+*/
+
+// commonly used constants
+#define c1 0xcc9e2d51u
+#define c2 0x1b873593u
+
+// Helper Functions
+uint rotl(uint x, uint r)
+{
+    return (x << r) | (x >> (32u - r));
 }
 
-// Time + Seed => float3 rand(float3, ID)
-float3 randTS(float3 input, int ID)
+uint rotr(uint x, uint r)
 {
-    float3 uvw = input + float3(Time, Time * 1.618033988749895, float(Seed + ID));
-
-    // Combine uvw into a single hash
-    uint hash = uint(uvw.x * 43758.5453123 + uvw.y * 76963.7543123 + uvw.z * 47113.7413123);
-    hash = (hash << 13) ^ hash;
-    hash = (hash * (hash * hash * 15731u + 789221u) + 1376312589u) & 0x7fffffffu;
-
-    // Map the hash to a float3 in the range [0, 1)
-    float3 random03 = float3(
-        float(hash & 0xFFFF) / 65535.0f,
-        float((hash >> 16) & 0xFFFF) / 65535.0f,
-        float((hash >> 32) & 0xFFFF) / 65535.0f
-    );
-
-    return random03;
+    return (x >> r) | (x << (32u - r));
 }
 
-// float3 Gradient(float3)
-float3 GradientNoise(float3 p, float time)
+// UE4's RandFast function
+// https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Shaders/Private/Random.ush
+float RandFast(float2 v)
 {
-    p += float3(time, time * 0.5, time * 0.2);
-
-    float3 i = floor(p);
-    float3 f = frac(p);
-
-    // Smooth interpolation function (e.g., cubic)
-    float3 u = f * f * (3.0 - 2.0 * f);
-
-    return lerp(
-        lerp(
-            lerp(randTS(i + float3(0, 0, 0), 1), randTS(i + float3(1, 0, 0), 1), u.x),
-            lerp(randTS(i + float3(0, 1, 0), 1), randTS(i + float3(1, 1, 0), 1), u.x),
-            u.y),
-        lerp(
-            lerp(randTS(i + float3(0, 0, 1), 1), randTS(i + float3(1, 0, 1), 1), u.x),
-            lerp(randTS(i + float3(0, 1, 1), 1), randTS(i + float3(1, 1, 1), 1), u.x),
-            u.y),
-        u.z
-    );
+    v = (1. / 4320.) * v + float2(0.25, 0.);
+    float state = frac(dot(v * v, float2(3571, 3571)));
+    return frac(state * state * (3571. * 2.));
 }
 
-// RAND_VEC on unit sphere => modified: https://www.shadertoy.com/view/3djyWW
+// Hash without Sine
+// https://www.shadertoy.com/view/4djSRW
+float HashNoSine11(float p)
+{
+    p = frac(p * .1031);
+    p *= p + 33.33;
+    p *= p + p;
+    return frac(p);
+}
+
+float HashNoSine12(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float HashNoSine13(float3 p3)
+{
+    p3 = frac(p3 * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float2 HashNoSine21(float p)
+{
+    float3 p3 = frac(float3(p, p, p) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float2 HashNoSine22(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float2 HashNoSine23(float3 p3)
+{
+    p3 = frac(p3 * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float3 HashNoSine31(float p)
+{
+    float3 p3 = frac(float3(p, p, p) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+float3 HashNoSine32(float2 p)
+{
+    float3 p3 = frac(float3(p.xyx) * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return frac((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+float3 HashNoSine33(float3 p3)
+{
+    p3 = frac(p3 * float3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return frac((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+float4 HashNoSine41(float p)
+{
+    float4 p4 = frac(float4(p, p, p, p) * float4(.1031, .1030, .0973, .1099));
+    p4 += dot(p4, p4.wzxy + 33.33);
+    return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 HashNoSine42(float2 p)
+{
+    float4 p4 = frac(float4(p.xyxy) * float4(.1031, .1030, .0973, .1099));
+    p4 += dot(p4, p4.wzxy + 33.33);
+    return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 HashNoSine43(float3 p)
+{
+    float4 p4 = frac(float4(p.xyzx) * float4(.1031, .1030, .0973, .1099));
+    p4 += dot(p4, p4.wzxy + 33.33);
+    return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 HashNoSine44(float4 p4)
+{
+    p4 = frac(p4 * float4(.1031, .1030, .0973, .1099));
+    p4 += dot(p4, p4.wzxy + 33.33);
+    return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+// Integer Hash - III
+// - Inigo Quilez, Integer Hash - III, 2017
+//   https://www.shadertoy.com/view/4tXyWN
+uint IntHash(uint2 x)
+{
+    uint2 q = 1103515245U * ((x >> 1U) ^ (x.yx));
+    uint n = 1103515245U * ((q.x) ^ (q.y >> 3U));
+
+    return n;
+}
+
+// Integer Hash - I
+// - Inigo Quilez, Integer Hash - I, 2017
+//   https://www.shadertoy.com/view/llGSzw
+uint IntHash(uint n)
+{
+    // integer hash copied from Hugo Elias
+    n = (n << 13U) ^ n;
+    n = n * (n * n * 15731U + 789221U) + 1376312589U;
+
+    return n;
+}
+
+// Interleaved Gradient Noise
+//  - Jimenez, Next Generation Post Processing in Call of Duty: Advanced Warfare
+//    Advances in Real-time Rendering, SIGGRAPH 2014
+float InterleavedGradientNoise(float2 v)
+{
+    float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
+    return frac(magic.z * frac(dot(v, magic.xy)));
+}
+
+// UE4's PseudoRandom function
+// https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Shaders/Private/Random.ush
+float PseudoHash(float2 v)
+{
+    v = frac(v / 128.) * 128. + float2(-64.340622, -72.465622);
+    return frac(dot(v.xyx * v.xyy, float3(20.390625, 60.703125, 2.4281209)));
+}
+
+// Modified RAND_VEC on unit sphere: https://www.shadertoy.com/view/3djyWW
 const float PI = 3.141592653;
 #define FK(k) asuint(cos(k))^asuint(k)
 float hash(float2 uv)
@@ -179,6 +289,7 @@ float3 randvec(float seed)
     return normalize(float3(h1, h2, h3));
 }
 
+#endif
 
 /*
     ##############################################################
@@ -186,6 +297,17 @@ float3 randvec(float seed)
     ##############################################################
 */
 
+float3 RandomRange(in float3 prev, in float3 bottom, in float3 top, in uint ID, in bool isUniform)
+{
+    float3 diff = top - bottom;
+    return isUniform ? HashNoSine13(float3(prev + ID * Time + Seed)) : HashNoSine33(float3(prev + ID * Time + Seed));
+}
+
+float3 RandomVector(in float3 prev, in uint ID)
+{
+    return normalize(HashNoSine33(float3(prev + Time * ID + Seed)) - 0.5);
+
+}
 
 void ResetScale(uint ID)
 {
@@ -195,10 +317,7 @@ void ResetScale(uint ID)
     }
     else if(ScaleScalarType == SCALAR_RANGED)
     {
-        float3 prev = SimulationStateBuffer[ID].Scale;
-        float3 diff = TopScale - BottomScale;
-        float3 rand = UniformScale ? randTS(prev.x, ID) : randTS(prev, ID);
-        SimulationStateBuffer[ID].Scale = BottomScale + diff * rand;
+        SimulationStateBuffer[ID].Scale = RandomRange(SimulationStateBuffer[ID].Scale, BottomScale, TopScale, ID, UniformScale);
     }
     else
     {
@@ -206,11 +325,12 @@ void ResetScale(uint ID)
     }
 }
 
+static const float3 PositionGenerator = float3(1234.5678, 5678.9012, 9012.3456);
 void ResetPosition(uint ID)
 {
     float3 prev = SimulationStateBuffer[ID].Position;
-                                        /* Zero if SimulationSpace == Local */
     float3 newPosition = CenterOffset + (SimulationSpace * EmitterPositionWS);
+                                        /* Zero if SimulationSpace == Local */
 
     if(PositionFunctionType == FUNCTION_POINT)
     {
@@ -218,8 +338,8 @@ void ResetPosition(uint ID)
     }
     else if(PositionFunctionType == FUNCTION_SPHERE)
     {
+        newPosition += RandomVector(prev + PositionGenerator, ID) * Radius * HashNoSine13(prev + ID);
                        /* Offset From Middle of sphere at [0-Radius] */
-        newPosition += randvec(hash(randTS(prev, ID).xy)) * Radius * randTS(prev.x, ID);
     }
     else
     {
@@ -231,16 +351,31 @@ void ResetPosition(uint ID)
 
 void ResetRotation(uint ID)
 {
+    if(RenderType != RENDER_MESH) return;
+    
     if(RotationScalarType == SCALAR_EXACT)
     {
         SimulationStateBuffer[ID].Rotation = ExactRotation;
     }
     else if(RotationScalarType == SCALAR_RANGED)
     {
-        float3 prev = SimulationStateBuffer[ID].Rotation;
-        float3 diff = TopRotation - BottomRotation;
-        float3 rand = UniformScale ? randTS(prev.x, ID) : randTS(prev, ID);
-        SimulationStateBuffer[ID].Rotation = BottomRotation + diff * rand;
+        SimulationStateBuffer[ID].Rotation = RandomRange(SimulationStateBuffer[ID].Rotation, BottomRotation, TopRotation, ID, false);
+    }
+    else
+    {
+        // TODO
+    }
+}
+
+void ResetVelocity(uint ID)
+{
+    if (VelocityScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].Velocity = ExactVelocity;
+    }
+    else if (VelocityScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].Velocity = RandomRange(SimulationStateBuffer[ID].Velocity, BottomVelocity, TopVelocity, ID, false);
     }
     else
     {
@@ -253,10 +388,10 @@ void ResetParticle(uint ID)
     ResetScale(ID);
     ResetPosition(ID);
     ResetRotation(ID);
+    ResetVelocity(ID);
     
-    SimulationStateBuffer[ID].Velocity          = ExactVelocity;
     SimulationStateBuffer[ID].ExternalVelocity  = 0.0f;
-    SimulationStateBuffer[ID].Colour            = GradientNoise(ID, Time);
+    SimulationStateBuffer[ID].Colour = HashNoSine44(float4(SimulationStateBuffer[ID].Colour * ID, Time + Seed + 3.1415)).rgb;
     SimulationStateBuffer[ID].Current_Max_Life  = 1;
     SimulationStateBuffer[ID].SimSpace_RendType = int2(SimulationSpace, RenderType);
 }
@@ -266,6 +401,12 @@ void MockInit(uint3 id : SV_DispatchThreadID)
 {
     uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
     if((int)ID >= MAX_PARTICLE_COUNT) return;
+    
+    SimulationStateBuffer[ID].Position  = HashNoSine31(PseudoHash(uint2(ID, Seed + 1       )));
+    SimulationStateBuffer[ID].Scale     = HashNoSine31(PseudoHash(uint2(ID, Seed + 121     )));
+    SimulationStateBuffer[ID].Rotation  = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321   )));
+    SimulationStateBuffer[ID].Velocity  = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321 )));
+    SimulationStateBuffer[ID].Colour    = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 )));
     
     SimulationStateBuffer[ID].Current_Max_Life  = 0.0f;
 }

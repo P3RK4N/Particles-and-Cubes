@@ -205,25 +205,25 @@ MonoBehaviour:
   RenderType: 0
   DrawGUI: 1
   BillboardTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}
-  ParticleMesh: {fileID: 0}
+  ParticleMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   StartVelocityGenerator:
-    Type: 0
-    ExactScalar: {x: -0.08, y: 0.92, z: 0}
-    Uniform: 0
-    BottomScalar: {x: -1.17, y: -0.94, z: -0.48}
-    TopScalar: {x: 1, y: 1.3, z: 1}
+    Type: 1
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 1
+    BottomScalar: {x: -1, y: -1, z: -1}
+    TopScalar: {x: 1, y: 1, z: 1}
   StartLifetimeGenerator:
     Type: 0
-    ExactScalar: 0
+    ExactScalar: 1.1
     Uniform: 0
-    BottomScalar: 0
+    BottomScalar: 0.1
     TopScalar: 5.01
   StartScaleGenerator:
     Type: 1
     ExactScalar: {x: 2.03, y: 2.03, z: 2.03}
     Uniform: 1
-    BottomScalar: {x: 1.08, y: 1.08, z: 1.08}
-    TopScalar: {x: 2.42, y: 2.42, z: 2.42}
+    BottomScalar: {x: 0.05, y: 0.05, z: 0.05}
+    TopScalar: {x: 1.42, y: 1.42, z: 1.42}
   StartRotationGenerator:
     Type: 0
     ExactScalar: {x: 0, y: 0, z: 0}
@@ -234,10 +234,16 @@ MonoBehaviour:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
     Radius: 3.51
-  MaximumParticleCount: 219
-  CurrentParticleCount: 0
-  EmissionRate: 195
-  EmissionAmount: 0
+  StartColourGenerator:
+    Type: 1
+    ExactScalar: {x: 0.14, y: 0.14, z: 0.14}
+    Uniform: 1
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 1, y: 1, z: 1}
+  MaximumParticleCount: 50000
+  CurrentParticleCount: 44456
+  EmissionRate: 123.87
+  EmissionAmount: 0.9454346
   UseGravity: 0
   ForceFields: []
 --- !u!4 &325595978
@@ -249,9 +255,9 @@ Transform:
   m_GameObject: {fileID: 325595975}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.14, y: 0, z: -1.28}
+  m_LocalPosition: {x: -37.57, y: 0, z: -7.74}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -578,6 +584,12 @@ MonoBehaviour:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
     Radius: 2.9
+  StartColourGenerator:
+    Type: 0
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 0
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 0, y: 0, z: 0}
   MaximumParticleCount: 1000
   CurrentParticleCount: 0
   EmissionRate: 700
@@ -593,7 +605,7 @@ Transform:
   m_GameObject: {fileID: 628951754}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 12.05, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

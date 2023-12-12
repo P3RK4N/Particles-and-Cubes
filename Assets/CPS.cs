@@ -199,6 +199,11 @@ public class CPS : MonoBehaviour
     /// </summary>
     [SerializeField] public FunctionGenerator           StartPositionGenerator;
 
+    /// <summary>
+    /// Initial colour stuff
+    /// </summary>
+    [SerializeField] public ScalarGenerator<Vector3>    StartColourGenerator;
+
 #endregion
 
 #region SimulationFields
@@ -216,7 +221,7 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Amount of particles emitted per second
     /// </summary>
-    [SerializeField] public int                         EmissionRate;
+    [SerializeField] public float                       EmissionRate;
     
     /// <summary>
     /// Tracks emission amount for current frame
@@ -237,7 +242,8 @@ public class CPS : MonoBehaviour
 
 
     public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 51;
+    public static int           GlobalStateSizeInFloat  = 61;
+    public static float         MinimalParticleLifetime = 0.1f;
 
     /// <summary>
     /// CPSSimulator instance
@@ -394,6 +400,12 @@ public class CPS : MonoBehaviour
         Simulator.SetVector ("ExactRotation",           StartRotationGenerator.ExactScalar);
         Simulator.SetVector ("BottomRotation",          StartRotationGenerator.BottomScalar);
         Simulator.SetVector ("TopRotation",             StartRotationGenerator.TopScalar);
+
+        // Set colour-related values
+        Simulator.SetInt    ("ColourScalarType",        ((int)StartColourGenerator.Type));
+        Simulator.SetVector ("ExactColour",             StartColourGenerator.ExactScalar);
+        Simulator.SetVector ("BottomColour",            StartColourGenerator.BottomScalar);
+        Simulator.SetVector ("TopColour",               StartColourGenerator.TopScalar);
     }
 
     void SynchronizeCounters()
@@ -696,7 +708,7 @@ public class CPSEditor : Editor
         EditorGUILayout.EndVertical();
     }
 
-    static void ManipulateScalarGenerator3D(/*CPS.ScalarGenerator<Vector3>*/ SerializedProperty scalarGen, string msg, bool nonNegative = false)
+    static void ManipulateScalarGenerator3D(/*CPS.ScalarGenerator<Vector3>*/ SerializedProperty scalarGen, string msg, Vector2? clamp = null)
     {
         var type            = scalarGen.FindPropertyRelativeOrFail("Type");
         var exactScalar     = scalarGen.FindPropertyRelativeOrFail("ExactScalar");
@@ -789,24 +801,24 @@ public class CPSEditor : Editor
             }
         });
 
-        if(nonNegative)
+        if(clamp.HasValue)
         {
-            exactScalar.vector3Value = NonNegative(exactScalar.vector3Value);
-            bottomScalar.vector3Value = NonNegative(bottomScalar.vector3Value);
-            topScalar.vector3Value = NonNegative(topScalar.vector3Value);
+            exactScalar.vector3Value = Clamp(exactScalar.vector3Value, clamp.Value);
+            bottomScalar.vector3Value = Clamp(bottomScalar.vector3Value, clamp.Value);
+            topScalar.vector3Value = Clamp(topScalar.vector3Value, clamp.Value);
         }
     }
 
-    static Vector3 NonNegative(Vector3 vector)
+    static Vector3 Clamp(Vector3 vector, Vector2 clamp)
     {
         return new Vector3(
-            Math.Max(vector.x, 0f),
-            Math.Max(vector.y, 0f),
-            Math.Max(vector.z, 0f)
+            Math.Clamp(vector.x, clamp.x, clamp.y),
+            Math.Clamp(vector.y, clamp.x, clamp.y),
+            Math.Clamp(vector.z, clamp.x, clamp.y)
         );
     }
 
-    static void ManipulateScalarGenerator1D(/*CPS.ScalarGenerator<float>*/ SerializedProperty scalarGen, string msg, bool nonNegative = false)
+    static void ManipulateScalarGenerator1D(/*CPS.ScalarGenerator<float>*/ SerializedProperty scalarGen, string msg, Vector2? clamp = null)
     {
         var type            = scalarGen.FindPropertyRelativeOrFail("Type");
         var exactScalar     = scalarGen.FindPropertyRelativeOrFail("ExactScalar");
@@ -850,11 +862,11 @@ public class CPSEditor : Editor
             }
         });
 
-        if(nonNegative)
+        if(clamp.HasValue)
         {
-            exactScalar.floatValue  = Mathf.Max(0, exactScalar.floatValue  );
-            topScalar.floatValue    = Mathf.Max(0, topScalar.floatValue    );
-            bottomScalar.floatValue = Mathf.Max(0, bottomScalar.floatValue );
+            exactScalar.floatValue  = Mathf.Clamp(exactScalar.floatValue, clamp.Value.x, clamp.Value.y);
+            topScalar.floatValue    = Mathf.Clamp(topScalar.floatValue, clamp.Value.x, clamp.Value.y);
+            bottomScalar.floatValue = Mathf.Clamp(bottomScalar.floatValue, clamp.Value.x, clamp.Value.y);
         }
     }
 
@@ -920,6 +932,7 @@ public class CPSEditor : Editor
     SerializedProperty  _StartRotationGenerator;
     SerializedProperty  _StartLifetimeGenerator;
     SerializedProperty  _StartPositionGenerator;
+    SerializedProperty  _StartColourGenerator;
 
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
@@ -949,6 +962,7 @@ public class CPSEditor : Editor
         _StartRotationGenerator     = _CPS.FindProperty("StartRotationGenerator");
         _StartLifetimeGenerator     = _CPS.FindProperty("StartLifetimeGenerator");
         _StartPositionGenerator     = _CPS.FindProperty("StartPositionGenerator");
+        _StartColourGenerator        = _CPS.FindProperty("StartColourGenerator");
 
         _MaximumParticleCount       = _CPS.FindProperty("MaximumParticleCount");
         _EmissionRate               = _CPS.FindProperty("EmissionRate");
@@ -989,17 +1003,19 @@ public class CPSEditor : Editor
         EditorGUILayout.PropertyField(_DrawGUI,         true);
     }
 
-    void StartSubMenu()
+    void PropertiesSubMenu()
     {
-        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime",       true );
+        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime",       new Vector2(CPS.MinimalParticleLifetime, float.MaxValue) );
         HorizontalSeparator();
-        ManipulateFunctionGenerator(_StartPositionGenerator,  "Position"             );
+        ManipulateFunctionGenerator(_StartPositionGenerator,  "Start Position"                                                           );
         HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale",    true );
+        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale",    new Vector2(float.Epsilon, float.MaxValue)               );
         HorizontalSeparator();
         Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"));
         HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity"       );
+        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity", null                                                     );
+        HorizontalSeparator();
+        ManipulateScalarGenerator3D(_StartColourGenerator,    "Start Colour",   new Vector2(0.0f, 1.0f)                                  );
     }
 
     void SimulationSubMenu()
@@ -1013,7 +1029,7 @@ public class CPSEditor : Editor
         });
 
         EditorGUILayout.PropertyField(_EmissionRate);
-        _EmissionRate.intValue = Mathf.Clamp(_EmissionRate.intValue, 0, CPS.HARD_LIMIT);
+        _EmissionRate.floatValue = Mathf.Clamp(_EmissionRate.floatValue, 0, CPS.HARD_LIMIT);
 
         HorizontalSeparator();
         
@@ -1029,9 +1045,9 @@ public class CPSEditor : Editor
         EditorGUILayout.Space();
         SubMenuContext(SettingsSubMenu,     "Settings",     SettingsColor);
         EditorGUILayout.Space();
-        SubMenuContext(StartSubMenu,        "Start",        StartColor);   
-        EditorGUILayout.Space();
         SubMenuContext(SimulationSubMenu,   "Simulation",   SimulationColor);   
+        EditorGUILayout.Space();
+        SubMenuContext(PropertiesSubMenu,   "Properties",   StartColor);   
 
         _CPS.ApplyModifiedProperties();
     }

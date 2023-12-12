@@ -91,6 +91,12 @@ cbuffer GlobalState
     float3 BottomRotation;
     float3 TopRotation;
     
+    // Colour
+    int ColourScalarType;
+    float3 ExactColour;
+    float3 BottomColour;
+    float3 TopColour;
+    
     // TODO: Expand new ones
 }; 
 
@@ -300,7 +306,19 @@ float3 randvec(float seed)
 float3 RandomRange(in float3 prev, in float3 bottom, in float3 top, in uint ID, in bool isUniform)
 {
     float3 diff = top - bottom;
-    return isUniform ? HashNoSine13(float3(prev + ID * Time + Seed)) : HashNoSine33(float3(prev + ID * Time + Seed));
+    return bottom +
+           diff *
+           (
+                isUniform ?
+                    HashNoSine13(float3(prev + ID * Time + Seed)) :
+                    HashNoSine33(float3(prev + ID * Time + Seed))
+            );
+}
+
+float RandomRange(in float prev, in float bottom, in float top, in uint ID)
+{
+    float diff = top - bottom;
+    return bottom + diff * HashNoSine13(float3(prev, ID * Time, Seed));
 }
 
 float3 RandomVector(in float3 prev, in uint ID)
@@ -325,7 +343,6 @@ void ResetScale(uint ID)
     }
 }
 
-static const float3 PositionGenerator = float3(1234.5678, 5678.9012, 9012.3456);
 void ResetPosition(uint ID)
 {
     float3 prev = SimulationStateBuffer[ID].Position;
@@ -338,7 +355,7 @@ void ResetPosition(uint ID)
     }
     else if(PositionFunctionType == FUNCTION_SPHERE)
     {
-        newPosition += RandomVector(prev + PositionGenerator, ID) * Radius * HashNoSine13(prev + ID);
+        newPosition += RandomVector(prev, ID) * Radius * HashNoSine13(prev + ID);
                        /* Offset From Middle of sphere at [0-Radius] */
     }
     else
@@ -383,16 +400,48 @@ void ResetVelocity(uint ID)
     }
 }
 
+void ResetLifetime(uint ID)
+{
+    if(LifetimeScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].Current_Max_Life = ExactLifetime;
+    }
+    else if(LifetimeScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].Current_Max_Life = RandomRange(SimulationStateBuffer[ID].Current_Max_Life.y, BottomLifetime, TopLifetime, ID);
+    }
+    else
+    {
+        // TODO
+    }
+}
+
+void ResetColour(uint ID)
+{
+    if (ColourScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].Colour = ExactColour;
+    }
+    else if (ColourScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].Colour = RandomRange(SimulationStateBuffer[ID].Colour, BottomColour, TopColour, ID, false);
+    }
+    else
+    {
+        // TODO
+    }
+}
+
 void ResetParticle(uint ID)
 {
     ResetScale(ID);
     ResetPosition(ID);
     ResetRotation(ID);
     ResetVelocity(ID);
+    ResetLifetime(ID);
+    ResetColour(ID);
     
     SimulationStateBuffer[ID].ExternalVelocity  = 0.0f;
-    SimulationStateBuffer[ID].Colour = HashNoSine44(float4(SimulationStateBuffer[ID].Colour * ID, Time + Seed + 3.1415)).rgb;
-    SimulationStateBuffer[ID].Current_Max_Life  = 1;
     SimulationStateBuffer[ID].SimSpace_RendType = int2(SimulationSpace, RenderType);
 }
 

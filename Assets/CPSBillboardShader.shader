@@ -54,7 +54,8 @@ Shader "Unlit/CPSBillboardShader"
                 float3  Rotation;
                 float3  Velocity;
                 float3  ExternalVelocity;
-                float3  Colour;
+                float3  StartColour;
+                float3  EndColour;
                 float2  Current_Max_Life;
                 int2    SimSpace_RendType;
             };
@@ -119,13 +120,19 @@ Shader "Unlit/CPSBillboardShader"
                 float3 TopRotation;
     
                 // Colour
-                int ColourScalarType;
-                float3 ExactColour;
-                float3 BottomColour;
-                float3 TopColour;
+                int StartColourScalarType;
+                float3 ExactStartColour;
+                float3 BottomStartColour;
+                float3 TopStartColour;
+                int UseEndColour;
+                int EndColourScalarType;
+                int UniformEndColour;
+                float3 ExactEndColour;
+                float3 BottomEndColour;
+                float3 TopEndColour;
     
                 // TODO: Expand new ones
-            }; 
+            };  
 
             struct GEOM_IN
             {
@@ -219,7 +226,7 @@ Shader "Unlit/CPSBillboardShader"
                 if(Current_Max_Life.x <= 0) { return; }
 
                 float p         = (Current_Max_Life.y - Current_Max_Life.x) / Current_Max_Life.y;
-                OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
+                OUT.Colour      = half4(UseEndColour ? lerp(SimulationStateBuffer[id].StartColour, SimulationStateBuffer[id].EndColour, p) : SimulationStateBuffer[id].StartColour, 1);
                 int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;

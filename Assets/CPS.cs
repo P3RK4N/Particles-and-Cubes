@@ -172,7 +172,7 @@ public class CPS : MonoBehaviour
 
 #endregion
 
-#region Start Fields
+#region Properties
 
     /// <summary>
     /// Initial position stuff (Shape in which particles generate)
@@ -207,7 +207,7 @@ public class CPS : MonoBehaviour
     /// Initial colour stuff
     /// </summary>
     [SerializeField] public ScalarGenerator<Vector3>    StartColourGenerator;
-    [SerializeField] public bool                        EndColour;
+    [SerializeField] public bool                        UseEndColour;
     [SerializeField] public ScalarGenerator<Vector3>    EndColourGenerator;
 
 #endregion
@@ -253,7 +253,7 @@ public class CPS : MonoBehaviour
 
 
     public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 74;
+    public static int           GlobalStateSizeInFloat  = 86;
     public static float         MinimalParticleLifetime = 0.1f;
 
     /// <summary>
@@ -421,15 +421,21 @@ public class CPS : MonoBehaviour
         Simulator.SetVector ("TopRotation",             StartRotationGenerator.TopScalar        );
 
         // Set colour-related values
-        Simulator.SetInt    ("ColourScalarType",        (int)StartColourGenerator.Type          );
-        Simulator.SetVector ("ExactColour",             StartColourGenerator.ExactScalar        );
-        Simulator.SetVector ("BottomColour",            StartColourGenerator.BottomScalar       );
-        Simulator.SetVector ("TopColour",               StartColourGenerator.TopScalar          );
-
+        Simulator.SetInt    ("StartColourScalarType",   (int)StartColourGenerator.Type          );
+        Simulator.SetVector ("ExactStartColour",        StartColourGenerator.ExactScalar        );
+        Simulator.SetVector ("BottomStartColour",       StartColourGenerator.BottomScalar       );
+        Simulator.SetVector ("TopStartColour",          StartColourGenerator.TopScalar          );
+        Simulator.SetInt    ("UseEndColour",            UseEndColour ? 1 : 0                    );
+        Simulator.SetInt    ("EndColourScalarType",     (int)EndColourGenerator.Type            );
+        Simulator.SetVector ("ExactEndColour",          EndColourGenerator.ExactScalar          );
+        Simulator.SetVector ("BottomEndColour",         EndColourGenerator.BottomScalar         );
+        Simulator.SetVector ("TopEndColour",            EndColourGenerator.TopScalar            );
+        
         // SHADER VALUES
-        BillboardRenderParams.matProps.SetInteger ("UseEndScale", UseEndScale ? 1 : 0           );
-        MeshRenderParams.matProps.SetInteger      ("UseEndScale", UseEndScale ? 1 : 0           );
-
+        BillboardRenderParams.matProps.SetInteger ("UseEndScale",  UseEndScale ? 1 : 0          );
+        MeshRenderParams.matProps.SetInteger      ("UseEndScale",  UseEndScale ? 1 : 0          );
+        BillboardRenderParams.matProps.SetInteger ("UseEndColour", UseEndColour ? 1 : 0         );
+        MeshRenderParams.matProps.SetInteger      ("UseEndColour", UseEndColour ? 1 : 0         );
     }
 
     void SynchronizeCounters()
@@ -480,7 +486,8 @@ public class CPS : MonoBehaviour
                 + 3 /* Rotation          */
                 + 3 /* Velocity          */
                 + 3 /* OuterVelocity     */
-                + 3 /* Colour            */
+                + 3 /* StartColour       */
+                + 3 /* EndColour         */
                 + 2 /* Current_Max_Life  */
                 + 2 /* SimSpace_RendType */
             ) /*Floats*/ * 4 /*Bytes*/
@@ -967,6 +974,8 @@ public class CPSEditor : Editor
     SerializedProperty  _StartPositionGenerator;
 
     SerializedProperty  _StartColourGenerator;
+    SerializedProperty  _UseEndColour;
+    SerializedProperty  _EndColourGenerator;
 
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
@@ -1004,7 +1013,9 @@ public class CPSEditor : Editor
 
         _StartPositionGenerator     = _CPS.FindProperty("StartPositionGenerator");
 
-        _StartColourGenerator        = _CPS.FindProperty("StartColourGenerator");
+        _StartColourGenerator       = _CPS.FindProperty("StartColourGenerator");
+        _UseEndColour               = _CPS.FindProperty("UseEndColour");
+        _EndColourGenerator         = _CPS.FindProperty("EndColourGenerator");
 
         _MaximumParticleCount       = _CPS.FindProperty("MaximumParticleCount");
         _EmissionRate               = _CPS.FindProperty("EmissionRate");
@@ -1074,6 +1085,11 @@ public class CPSEditor : Editor
     HorizontalSeparator();
 
         ManipulateScalarGenerator3D(_StartColourGenerator,    "Start Colour",   new Vector2(0.0f, 1.0f)                                              );
+        EditorGUILayout.PropertyField(_UseEndColour, true);
+        if(_UseEndColour.boolValue)
+        {
+            ManipulateScalarGenerator3D(_EndColourGenerator,   "End Colour",     new Vector2(0.0f, 1.0f)                                             );
+        }
     }
 
     void SimulationSubMenu()

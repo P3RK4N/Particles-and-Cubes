@@ -42,7 +42,6 @@ Shader "Unlit/CPSMeshShader"
             static const int FALLOFF_QUADRATIC  = 2;
             static const int FALLOFF_CUBOID     = 3;
 
-
             struct SimulationState
             {
                 float3  Position;
@@ -51,7 +50,8 @@ Shader "Unlit/CPSMeshShader"
                 float3  Rotation;
                 float3  Velocity;
                 float3  ExternalVelocity;
-                float3  Colour;
+                float3  StartColour;
+                float3  EndColour;
                 float2  Current_Max_Life;
                 int2    SimSpace_RendType;
             };
@@ -116,13 +116,19 @@ Shader "Unlit/CPSMeshShader"
                 float3 TopRotation;
     
                 // Colour
-                int ColourScalarType;
-                float3 ExactColour;
-                float3 BottomColour;
-                float3 TopColour;
+                int StartColourScalarType;
+                float3 ExactStartColour;
+                float3 BottomStartColour;
+                float3 TopStartColour;
+                int UseEndColour;
+                int EndColourScalarType;
+                int UniformEndColour;
+                float3 ExactEndColour;
+                float3 BottomEndColour;
+                float3 TopEndColour;
     
                 // TODO: Expand new ones
-            }; 
+            };
 
             struct VERT_IN
             {
@@ -227,7 +233,6 @@ Shader "Unlit/CPSMeshShader"
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;
                 float3 scale    = UseEndScale ? lerp(SimulationStateBuffer[id].StartScale, SimulationStateBuffer[id].EndScale, p) : SimulationStateBuffer[id].StartScale;
-                // float3 scale    = UseEndScale == 1 ? SimulationStateBuffer[id].EndScale : SimulationStateBuffer[id].StartScale;
 
 
                 // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
@@ -251,7 +256,7 @@ Shader "Unlit/CPSMeshShader"
 
                 OUT.PositionCS  = UnityWorldToClipPos(positionWS);
                 OUT.UV          = IN.UV;
-                OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
+                OUT.Colour      = half4(UseEndColour ? lerp(SimulationStateBuffer[id].StartColour, SimulationStateBuffer[id].EndColour, p) : SimulationStateBuffer[id].StartColour, 1);
                 OUT.Normal      = IN.Normal;
                 OUT.PositionWS  = positionWS.xyz;
 

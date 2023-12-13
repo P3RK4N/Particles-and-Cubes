@@ -206,16 +206,16 @@ MonoBehaviour:
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
   StartColourGenerator:
-    Type: 1
-    ExactScalar: {x: 0.14, y: 0.14, z: 0.14}
+    Type: 0
+    ExactScalar: {x: 0, y: 0, z: 0}
     Uniform: 1
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 1, y: 1, z: 1}
-  EndColour: 0
+  UseEndColour: 1
   EndColourGenerator:
     Type: 0
-    ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
   MaximumParticleCount: 50000
@@ -583,7 +583,7 @@ MonoBehaviour:
     Uniform: 0
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
-  EndColour: 0
+  UseEndColour: 0
   EndColourGenerator:
     Type: 0
     ExactScalar: {x: 0, y: 0, z: 0}

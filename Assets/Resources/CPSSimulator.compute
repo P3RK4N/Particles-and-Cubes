@@ -34,7 +34,8 @@ struct SimulationState
     float3  Rotation;
     float3  Velocity;
     float3  ExternalVelocity;
-    float3  Colour;
+    float3  StartColour;
+    float3  EndColour;
     float2  Current_Max_Life;
     int2    SimSpace_RendType;
 };
@@ -99,10 +100,16 @@ cbuffer GlobalState
     float3 TopRotation;
     
     // Colour
-    int ColourScalarType;
-    float3 ExactColour;
-    float3 BottomColour;
-    float3 TopColour;
+    int StartColourScalarType;
+    float3 ExactStartColour;
+    float3 BottomStartColour;
+    float3 TopStartColour;
+    int UseEndColour;
+    int EndColourScalarType;
+    int UniformEndColour;
+    float3 ExactEndColour;
+    float3 BottomEndColour;
+    float3 TopEndColour;
     
     // TODO: Expand new ones
 }; 
@@ -448,13 +455,28 @@ void ResetLifetime(uint ID)
 
 void ResetColour(uint ID)
 {
-    if (ColourScalarType == SCALAR_EXACT)
+    if (StartColourScalarType == SCALAR_EXACT)
     {
-        SimulationStateBuffer[ID].Colour = ExactColour;
+        SimulationStateBuffer[ID].StartColour = ExactStartColour;
     }
-    else if (ColourScalarType == SCALAR_RANGED)
+    else if (StartColourScalarType == SCALAR_RANGED)
     {
-        SimulationStateBuffer[ID].Colour = RandomRange(SimulationStateBuffer[ID].Colour, BottomColour, TopColour, ID, false);
+        SimulationStateBuffer[ID].StartColour = RandomRange(SimulationStateBuffer[ID].StartColour, BottomStartColour, TopStartColour, ID, false);
+    }
+    else
+    {
+        // TODO
+    }
+    
+    if(UseEndColour == 0) return;
+
+    if (EndColourScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].EndColour = ExactEndColour;
+    }
+    else if (EndColourScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].EndColour = RandomRange(SimulationStateBuffer[ID].EndColour, BottomEndColour, TopEndColour, ID, false);
     }
     else
     {
@@ -483,12 +505,13 @@ void MockInit(uint3 id : SV_DispatchThreadID)
     uint ID = id.x + id.y * DISPATCH_NUM * CPS_GROUP_SIZE;
     if((int)ID >= MAX_PARTICLE_COUNT) return;
     
-    SimulationStateBuffer[ID].Position      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1       )));
-    SimulationStateBuffer[ID].StartScale    = HashNoSine31(PseudoHash(uint2(ID, Seed + 121     )));
-    SimulationStateBuffer[ID].EndScale      = HashNoSine31(PseudoHash(uint2(ID, Seed + 212     )));
-    SimulationStateBuffer[ID].Rotation      = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321   )));
-    SimulationStateBuffer[ID].Velocity      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321 )));
-    SimulationStateBuffer[ID].Colour        = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 )));
+    SimulationStateBuffer[ID].Position      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1            )));
+    SimulationStateBuffer[ID].StartScale    = HashNoSine31(PseudoHash(uint2(ID, Seed + 121          )));
+    SimulationStateBuffer[ID].EndScale      = HashNoSine31(PseudoHash(uint2(ID, Seed + 212          )));
+    SimulationStateBuffer[ID].Rotation      = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321        )));
+    SimulationStateBuffer[ID].Velocity      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321      )));
+    SimulationStateBuffer[ID].StartColour   = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234      )));
+    SimulationStateBuffer[ID].EndColour     = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 * 2  )));
     
     SimulationStateBuffer[ID].Current_Max_Life  = 0.0f;
 }

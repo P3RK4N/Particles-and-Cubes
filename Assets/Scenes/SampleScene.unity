@@ -198,7 +198,6 @@ MonoBehaviour:
     Uniform: 0
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
-  RotationOverTime: 0
   RotationOverTimeGenerator:
     Type: 0
     ExactScalar: {x: 0, y: 0, z: 0}
@@ -511,7 +510,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &628951755
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -534,20 +533,20 @@ MonoBehaviour:
   RenderType: 2
   DrawGUI: 1
   BillboardTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}
-  ParticleMesh: {fileID: 0}
+  ParticleMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
   StartPositionGenerator:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
     Radius: 2.9
   StartLifetimeGenerator:
     Type: 0
-    ExactScalar: 0.1
+    ExactScalar: 2.2
     Uniform: 0
     BottomScalar: 0.1
     TopScalar: 5.01
   StartVelocityGenerator:
     Type: 0
-    ExactScalar: {x: 0, y: 0, z: 0}
+    ExactScalar: {x: 2.08, y: 2.08, z: 2.08}
     Uniform: 1
     BottomScalar: {x: -1.17, y: -0.94, z: -0.48}
     TopScalar: {x: 1, y: 1.3, z: 1}
@@ -557,45 +556,44 @@ MonoBehaviour:
     Uniform: 1
     BottomScalar: {x: 0.28, y: 0.28, z: 0.28}
     TopScalar: {x: 0.71, y: 0.71, z: 0.71}
-  UseEndScale: 0
+  UseEndScale: 1
   EndScaleGenerator:
     Type: 0
-    ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
-    BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 0, y: 0, z: 0}
+    ExactScalar: {x: 0.48, y: 0.48, z: 0.48}
+    Uniform: 1
+    BottomScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
+    TopScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
   StartRotationGenerator:
-    Type: 0
+    Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
-    BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 0, y: 0, z: 0}
-  RotationOverTime: 0
+    Uniform: 1
+    BottomScalar: {x: -180, y: -180, z: -180}
+    TopScalar: {x: 180, y: 180, z: 180}
   RotationOverTimeGenerator:
-    Type: 0
+    Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
-    BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 0, y: 0, z: 0}
+    Uniform: 1
+    BottomScalar: {x: -30, y: -30, z: -30}
+    TopScalar: {x: 30, y: 30, z: 30}
   StartColourGenerator:
-    Type: 0
+    Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
+    Uniform: 1
     BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 0, y: 0, z: 0}
-  UseEndColour: 0
+    TopScalar: {x: 1, y: 1, z: 1}
+  UseEndColour: 1
   EndColourGenerator:
-    Type: 0
-    ExactScalar: {x: 0, y: 0, z: 0}
+    Type: 1
+    ExactScalar: {x: 0.18, y: 0.18, z: 0.18}
     Uniform: 0
     BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 1, y: 1, z: 0}
   MaximumParticleCount: 1000
-  CurrentParticleCount: 0
-  EmissionRate: 700
-  EmissionAmount: 0
-  Gravity: 0
-  Drag: 0
+  CurrentParticleCount: 840
+  EmissionRate: 382.82
+  EmissionAmount: 0.40343094
+  Gravity: 1.84
+  Drag: 0.06
   ForceFields: []
 --- !u!4 &628951756
 Transform:
@@ -606,7 +604,7 @@ Transform:
   m_GameObject: {fileID: 628951754}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12.05, y: 0, z: 0}
+  m_LocalPosition: {x: -27.5, y: 0, z: -7.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

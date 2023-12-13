@@ -200,7 +200,6 @@ public class CPS : MonoBehaviour
     /// Initial rotation stuff
     /// </summary>
     [SerializeField] public ScalarGenerator<Vector3>    StartRotationGenerator;
-    [SerializeField] public bool                        RotationOverTime;
     [SerializeField] public ScalarGenerator<Vector3>    RotationOverTimeGenerator;
 
     /// <summary>
@@ -253,7 +252,7 @@ public class CPS : MonoBehaviour
 
 
     public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 86;
+    public static int           GlobalStateSizeInFloat  = 96;
     public static float         MinimalParticleLifetime = 0.1f;
 
     /// <summary>
@@ -366,70 +365,74 @@ public class CPS : MonoBehaviour
     void RefreshGlobalStateBuffer()
     {
         // Set Settings Stuff
-        Simulator.SetInt    ("Seed",                    (int)Seed                               );
-        Simulator.SetInt    ("SimulationSpace",         (int)SimulationSpace                    );
-        Simulator.SetInt    ("RenderType",              (int)RenderType                         );
+        Simulator.SetInt    ("Seed",                        (int)Seed                               );
+        Simulator.SetInt    ("SimulationSpace",             (int)SimulationSpace                    );
+        Simulator.SetInt    ("RenderType",                  (int)RenderType                         );
         
         // Set kernel-related values
-        Simulator.SetInt    ("DISPATCH_NUM",            GetDispatchNum()                        );
-        Simulator.SetInt    ("MAX_PARTICLE_COUNT",      MaximumParticleCount                    );
+        Simulator.SetInt    ("DISPATCH_NUM",                GetDispatchNum()                        );
+        Simulator.SetInt    ("MAX_PARTICLE_COUNT",          MaximumParticleCount                    );
 
         // Set time-related values
-        Simulator.SetFloat  ("DeltaTime",               Time.deltaTime                          );
-        Simulator.SetFloat  ("Time",                    Time.time                               );
+        Simulator.SetFloat  ("DeltaTime",                   Time.deltaTime                          );
+        Simulator.SetFloat  ("Time",                        Time.time                               );
 
         // Set environment-related values
-        Simulator.SetVector ("EmitterPositionWS",       tf.position                             );
-        Simulator.SetFloat  ("GravityForce",            Gravity                                 );
-        Simulator.SetFloat  ("DragForce",               Drag                                    );                      
+        Simulator.SetVector ("EmitterPositionWS",           tf.position                             );
+        Simulator.SetFloat  ("GravityForce",                Gravity                                 );
+        Simulator.SetFloat  ("DragForce",                   Drag                                    );                      
 
         // Set lifetime-related values
-        Simulator.SetInt    ("LifetimeScalarType",      (int)StartLifetimeGenerator.Type        );
-        Simulator.SetFloat  ("ExactLifetime",           StartLifetimeGenerator.ExactScalar      );
-        Simulator.SetFloat  ("BottomLifetime",          StartLifetimeGenerator.BottomScalar     );
-        Simulator.SetFloat  ("TopLifetime",             StartLifetimeGenerator.TopScalar        );
+        Simulator.SetInt    ("LifetimeScalarType",          (int)StartLifetimeGenerator.Type        );
+        Simulator.SetFloat  ("ExactLifetime",               StartLifetimeGenerator.ExactScalar      );
+        Simulator.SetFloat  ("BottomLifetime",              StartLifetimeGenerator.BottomScalar     );
+        Simulator.SetFloat  ("TopLifetime",                 StartLifetimeGenerator.TopScalar        );
 
         // Set position-related values
-        Simulator.SetInt    ("PositionFunctionType",    (int)StartPositionGenerator.Type        );
-        Simulator.SetVector ("CenterOffset",            StartPositionGenerator.CenterOffset     );
-        Simulator.SetFloat  ("Radius",                  StartPositionGenerator.Radius           );
+        Simulator.SetInt    ("PositionFunctionType",        (int)StartPositionGenerator.Type        );
+        Simulator.SetVector ("CenterOffset",                StartPositionGenerator.CenterOffset     );
+        Simulator.SetFloat  ("Radius",                      StartPositionGenerator.Radius           );
 
         // Set velocity-related values
-        Simulator.SetInt    ("VelocityScalarType",      (int)StartVelocityGenerator.Type        );
-        Simulator.SetVector ("ExactVelocity",           StartVelocityGenerator.ExactScalar      );
-        Simulator.SetVector ("BottomVelocity",          StartVelocityGenerator.BottomScalar     );
-        Simulator.SetVector ("TopVelocity",             StartVelocityGenerator.TopScalar        );
+        Simulator.SetInt    ("VelocityScalarType",          (int)StartVelocityGenerator.Type        );
+        Simulator.SetVector ("ExactVelocity",               StartVelocityGenerator.ExactScalar      );
+        Simulator.SetVector ("BottomVelocity",              StartVelocityGenerator.BottomScalar     );
+        Simulator.SetVector ("TopVelocity",                 StartVelocityGenerator.TopScalar        );
 
         // Set scale-related values
-        Simulator.SetInt    ("StartScaleScalarType",    (int)StartScaleGenerator.Type           );
-        Simulator.SetInt    ("UniformStartScale",       StartScaleGenerator.Uniform ? 1 : 0     );
-        Simulator.SetVector ("ExactStartScale",         StartScaleGenerator.ExactScalar         );
-        Simulator.SetVector ("BottomStartScale",        StartScaleGenerator.BottomScalar        );
-        Simulator.SetVector ("TopStartScale",           StartScaleGenerator.TopScalar           );
-        Simulator.SetInt    ("UseEndScale",             UseEndScale ? 1 : 0                     );
+        Simulator.SetInt    ("StartScaleScalarType",        (int)StartScaleGenerator.Type           );
+        Simulator.SetInt    ("UniformStartScale",           StartScaleGenerator.Uniform ? 1 : 0     );
+        Simulator.SetVector ("ExactStartScale",             StartScaleGenerator.ExactScalar         );
+        Simulator.SetVector ("BottomStartScale",            StartScaleGenerator.BottomScalar        );
+        Simulator.SetVector ("TopStartScale",               StartScaleGenerator.TopScalar           );
+        Simulator.SetInt    ("UseEndScale",                 UseEndScale ? 1 : 0                     );
 
-        Simulator.SetInt    ("EndScaleScalarType",      (int)EndScaleGenerator.Type             );
-        Simulator.SetInt    ("UniformEndScale",         EndScaleGenerator.Uniform ? 1 : 0       );
-        Simulator.SetVector ("ExactEndScale",           EndScaleGenerator.ExactScalar           );
-        Simulator.SetVector ("BottomEndScale",          EndScaleGenerator.BottomScalar          );
-        Simulator.SetVector ("TopEndScale",             EndScaleGenerator.TopScalar             );
+        Simulator.SetInt    ("EndScaleScalarType",          (int)EndScaleGenerator.Type             );
+        Simulator.SetInt    ("UniformEndScale",             EndScaleGenerator.Uniform ? 1 : 0       );
+        Simulator.SetVector ("ExactEndScale",               EndScaleGenerator.ExactScalar           );
+        Simulator.SetVector ("BottomEndScale",              EndScaleGenerator.BottomScalar          );
+        Simulator.SetVector ("TopEndScale",                 EndScaleGenerator.TopScalar             );
 
         // Set rotation-related values
-        Simulator.SetInt    ("RotationScalarType",      (int)StartRotationGenerator.Type        );
-        Simulator.SetVector ("ExactRotation",           StartRotationGenerator.ExactScalar      );
-        Simulator.SetVector ("BottomRotation",          StartRotationGenerator.BottomScalar     );
-        Simulator.SetVector ("TopRotation",             StartRotationGenerator.TopScalar        );
+        Simulator.SetInt    ("RotationScalarType",          (int)StartRotationGenerator.Type        );
+        Simulator.SetVector ("ExactRotation",               StartRotationGenerator.ExactScalar      );
+        Simulator.SetVector ("BottomRotation",              StartRotationGenerator.BottomScalar     );
+        Simulator.SetVector ("TopRotation",                 StartRotationGenerator.TopScalar        );
+        Simulator.SetInt    ("RotationOverTimeScalarType",  (int)RotationOverTimeGenerator.Type     );
+        Simulator.SetVector ("ExactRotationOverTime",       RotationOverTimeGenerator.ExactScalar   );
+        Simulator.SetVector ("BottomRotationOverTime",      RotationOverTimeGenerator.BottomScalar  );
+        Simulator.SetVector ("TopRotationOverTime",         RotationOverTimeGenerator.TopScalar     );
 
         // Set colour-related values
-        Simulator.SetInt    ("StartColourScalarType",   (int)StartColourGenerator.Type          );
-        Simulator.SetVector ("ExactStartColour",        StartColourGenerator.ExactScalar        );
-        Simulator.SetVector ("BottomStartColour",       StartColourGenerator.BottomScalar       );
-        Simulator.SetVector ("TopStartColour",          StartColourGenerator.TopScalar          );
-        Simulator.SetInt    ("UseEndColour",            UseEndColour ? 1 : 0                    );
-        Simulator.SetInt    ("EndColourScalarType",     (int)EndColourGenerator.Type            );
-        Simulator.SetVector ("ExactEndColour",          EndColourGenerator.ExactScalar          );
-        Simulator.SetVector ("BottomEndColour",         EndColourGenerator.BottomScalar         );
-        Simulator.SetVector ("TopEndColour",            EndColourGenerator.TopScalar            );
+        Simulator.SetInt    ("StartColourScalarType",       (int)StartColourGenerator.Type          );
+        Simulator.SetVector ("ExactStartColour",            StartColourGenerator.ExactScalar        );
+        Simulator.SetVector ("BottomStartColour",           StartColourGenerator.BottomScalar       );
+        Simulator.SetVector ("TopStartColour",              StartColourGenerator.TopScalar          );
+        Simulator.SetInt    ("UseEndColour",                UseEndColour ? 1 : 0                    );
+        Simulator.SetInt    ("EndColourScalarType",         (int)EndColourGenerator.Type            );
+        Simulator.SetVector ("ExactEndColour",              EndColourGenerator.ExactScalar          );
+        Simulator.SetVector ("BottomEndColour",             EndColourGenerator.BottomScalar         );
+        Simulator.SetVector ("TopEndColour",                EndColourGenerator.TopScalar            );
         
         // SHADER VALUES
         BillboardRenderParams.matProps.SetInteger ("UseEndScale",  UseEndScale ? 1 : 0          );
@@ -484,13 +487,15 @@ public class CPS : MonoBehaviour
                 + 3 /* StartScale        */
                 + 3 /* EndScale          */
                 + 3 /* Rotation          */
+                + 3 /* RotationOverTime  */
                 + 3 /* Velocity          */
                 + 3 /* OuterVelocity     */
                 + 3 /* StartColour       */
                 + 3 /* EndColour         */
                 + 2 /* Current_Max_Life  */
                 + 2 /* SimSpace_RendType */
-            ) /*Floats*/ * 4 /*Bytes*/
+            ) /*Floats*/
+            * 4 /*Bytes*/
         );
 
         // Global state buffer
@@ -968,6 +973,7 @@ public class CPSEditor : Editor
     SerializedProperty  _EndScaleGenerator;
 
     SerializedProperty  _StartRotationGenerator;
+    SerializedProperty  _RotationOverTimeGenerator;
 
     SerializedProperty  _StartLifetimeGenerator;
 
@@ -1008,6 +1014,7 @@ public class CPSEditor : Editor
         _EndScaleGenerator          = _CPS.FindProperty("EndScaleGenerator");
 
         _StartRotationGenerator     = _CPS.FindProperty("StartRotationGenerator");
+        _RotationOverTimeGenerator  = _CPS.FindProperty("RotationOverTimeGenerator");
 
         _StartLifetimeGenerator     = _CPS.FindProperty("StartLifetimeGenerator");
 
@@ -1076,7 +1083,14 @@ public class CPSEditor : Editor
 
     HorizontalSeparator();
 
-        Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation") );
+        Disabled((CPS.ParticleRenderType)_RenderType.enumValueIndex != CPS.ParticleRenderType.Mesh, () =>
+        {
+            ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"                                                                    );
+        });
+        Disabled((CPS.ParticleRenderType)_RenderType.enumValueIndex != CPS.ParticleRenderType.Mesh, () =>
+        {
+            ManipulateScalarGenerator3D(_RotationOverTimeGenerator, "Rotation Over Time"                                                             );
+        });
 
     HorizontalSeparator();
 

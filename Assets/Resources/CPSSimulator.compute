@@ -32,6 +32,7 @@ struct SimulationState
     float3  StartScale;
     float3  EndScale;
     float3  Rotation;
+    float3  RotationOverTime;
     float3  Velocity;
     float3  ExternalVelocity;
     float3  StartColour;
@@ -98,6 +99,10 @@ cbuffer GlobalState
     float3 ExactRotation;
     float3 BottomRotation;
     float3 TopRotation;
+    int RotationOverTimeScalarType;
+    float3 ExactRotationOverTime;
+    float3 BottomRotationOverTime;
+    float3 TopRotationOverTime;
     
     // Colour
     int StartColourScalarType;
@@ -419,6 +424,19 @@ void ResetRotation(uint ID)
     {
         // TODO
     }
+    
+    if (RotationOverTimeScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].RotationOverTime = ExactRotationOverTime;
+    }
+    else if (RotationOverTimeScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].RotationOverTime = RandomRange(SimulationStateBuffer[ID].RotationOverTime, BottomRotationOverTime, TopRotationOverTime, ID, false);
+    }
+    else
+    {
+        // TODO
+    }
 }
 
 void ResetVelocity(uint ID)
@@ -505,13 +523,14 @@ void MockInit(uint3 id : SV_DispatchThreadID)
     uint ID = id.x + id.y * DISPATCH_NUM * CPS_GROUP_SIZE;
     if((int)ID >= MAX_PARTICLE_COUNT) return;
     
-    SimulationStateBuffer[ID].Position      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1            )));
-    SimulationStateBuffer[ID].StartScale    = HashNoSine31(PseudoHash(uint2(ID, Seed + 121          )));
-    SimulationStateBuffer[ID].EndScale      = HashNoSine31(PseudoHash(uint2(ID, Seed + 212          )));
-    SimulationStateBuffer[ID].Rotation      = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321        )));
-    SimulationStateBuffer[ID].Velocity      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321      )));
-    SimulationStateBuffer[ID].StartColour   = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234      )));
-    SimulationStateBuffer[ID].EndColour     = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 * 2  )));
+    SimulationStateBuffer[ID].Position          = HashNoSine31(PseudoHash(uint2(ID, Seed + 1            )));
+    SimulationStateBuffer[ID].StartScale        = HashNoSine31(PseudoHash(uint2(ID, Seed + 121          )));
+    SimulationStateBuffer[ID].EndScale          = HashNoSine31(PseudoHash(uint2(ID, Seed + 212          )));
+    SimulationStateBuffer[ID].Rotation          = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321        )));
+    SimulationStateBuffer[ID].RotationOverTime  = HashNoSine31(PseudoHash(uint2(ID, Seed + 32123        )));
+    SimulationStateBuffer[ID].Velocity          = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321      )));
+    SimulationStateBuffer[ID].StartColour       = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234      )));
+    SimulationStateBuffer[ID].EndColour         = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 * 2  )));
     
     SimulationStateBuffer[ID].Current_Max_Life  = 0.0f;
 }
@@ -561,6 +580,9 @@ void MockTick(uint3 id : SV_DispatchThreadID)
 
     // Age it
     SimulationStateBuffer[ID].Current_Max_Life.x -= DeltaTime;
+    
+    // Rotate it
+    SimulationStateBuffer[ID].Rotation += SimulationStateBuffer[ID].RotationOverTime * DeltaTime;
     
     // Apply external force - Gravity
     SimulationStateBuffer[ID].ExternalVelocity.y += GravityForce * DeltaTime;

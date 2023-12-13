@@ -52,6 +52,7 @@ Shader "Unlit/CPSBillboardShader"
                 float3  StartScale;
                 float3  EndScale;
                 float3  Rotation;
+                float3  RotationOverTime;
                 float3  Velocity;
                 float3  ExternalVelocity;
                 float3  StartColour;
@@ -118,6 +119,10 @@ Shader "Unlit/CPSBillboardShader"
                 float3 ExactRotation;
                 float3 BottomRotation;
                 float3 TopRotation;
+                int RotationOverTimeScalarType;
+                float3 ExactRotationOverTime;
+                float3 BottomRotationOverTime;
+                float3 TopRotationOverTime;
     
                 // Colour
                 int StartColourScalarType;

@@ -48,6 +48,7 @@ Shader "Unlit/CPSMeshShader"
                 float3  StartScale;
                 float3  EndScale;
                 float3  Rotation;
+                float3  RotationOverTime;
                 float3  Velocity;
                 float3  ExternalVelocity;
                 float3  StartColour;
@@ -114,6 +115,10 @@ Shader "Unlit/CPSMeshShader"
                 float3 ExactRotation;
                 float3 BottomRotation;
                 float3 TopRotation;
+                int RotationOverTimeScalarType;
+                float3 ExactRotationOverTime;
+                float3 BottomRotationOverTime;
+                float3 TopRotationOverTime;
     
                 // Colour
                 int StartColourScalarType;
@@ -128,7 +133,7 @@ Shader "Unlit/CPSMeshShader"
                 float3 TopEndColour;
     
                 // TODO: Expand new ones
-            };
+            }; 
 
             struct VERT_IN
             {
@@ -248,7 +253,9 @@ Shader "Unlit/CPSMeshShader"
                     0,          0,          0,          1
                 );
 
-                float4 offsetOS = mul(ToObject, mul(EulerRotation(rot), IN.PositionOS));
+                float4x4 ToObjectRot = EulerRotation(rot);
+
+                float4 offsetOS = mul(ToObject, mul(ToObjectRot, IN.PositionOS));
                 float4 offsetWS = mul(space == LOCAL_SPACE ? ObjectToWorld : Identity, float4(pos, 1));
 
                 float4 positionWS = offsetWS + offsetOS;
@@ -257,7 +264,7 @@ Shader "Unlit/CPSMeshShader"
                 OUT.PositionCS  = UnityWorldToClipPos(positionWS);
                 OUT.UV          = IN.UV;
                 OUT.Colour      = half4(UseEndColour ? lerp(SimulationStateBuffer[id].StartColour, SimulationStateBuffer[id].EndColour, p) : SimulationStateBuffer[id].StartColour, 1);
-                OUT.Normal      = IN.Normal;
+                OUT.Normal      = mul(ToObjectRot, IN.Normal);
                 OUT.PositionWS  = positionWS.xyz;
 
                 return OUT;

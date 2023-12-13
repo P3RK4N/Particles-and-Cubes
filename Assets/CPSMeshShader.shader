@@ -76,6 +76,7 @@ Shader "Unlit/CPSMeshShader"
                 // Environment Stuff
                 float3 EmitterPositionWS;
                 float GravityForce;
+                float DragForce;
     
                 // Lifetime
                 int LifetimeScalarType;

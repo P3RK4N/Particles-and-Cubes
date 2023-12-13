@@ -169,26 +169,26 @@ MonoBehaviour:
     Radius: 3.51
   StartLifetimeGenerator:
     Type: 0
-    ExactScalar: 4.1
+    ExactScalar: 5.12
     Uniform: 0
-    BottomScalar: 0.1
-    TopScalar: 5.01
+    BottomScalar: 0.54
+    TopScalar: 6.21
   StartVelocityGenerator:
     Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
     Uniform: 1
-    BottomScalar: {x: -1, y: -1, z: -1}
+    BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 1, y: 1, z: 1}
   StartScaleGenerator:
     Type: 0
-    ExactScalar: {x: 0.33, y: 0.33, z: 0.33}
+    ExactScalar: {x: 1, y: 1, z: 1}
     Uniform: 1
     BottomScalar: {x: 0.05, y: 0.05, z: 0.05}
     TopScalar: {x: 1.42, y: 1.42, z: 1.42}
-  UseEndScale: 1
+  UseEndScale: 0
   EndScaleGenerator:
     Type: 0
-    ExactScalar: {x: 2.15, y: 2.15, z: 2.15}
+    ExactScalar: {x: 1.34, y: 1.34, z: 1.34}
     Uniform: 1
     BottomScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
     TopScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
@@ -220,9 +220,10 @@ MonoBehaviour:
     TopScalar: {x: 0, y: 0, z: 0}
   MaximumParticleCount: 50000
   CurrentParticleCount: 44456
-  EmissionRate: 6.32
+  EmissionRate: 26107
   EmissionAmount: 0.9454346
-  UseGravity: 0
+  Gravity: 1.75
+  Drag: 0.08
   ForceFields: []
 --- !u!4 &325595978
 Transform:
@@ -593,7 +594,8 @@ MonoBehaviour:
   CurrentParticleCount: 0
   EmissionRate: 700
   EmissionAmount: 0
-  UseGravity: 0
+  Gravity: 0
+  Drag: 0
   ForceFields: []
 --- !u!4 &628951756
 Transform:

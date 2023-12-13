@@ -235,9 +235,14 @@ public class CPS : MonoBehaviour
     public float                                        EmissionAmount;
 
     /// <summary>
-    /// Whether to use gravity
+    /// Gravity intensity
     /// </summary>
-    [SerializeField] public bool UseGravity;
+    [SerializeField] public float                       Gravity;
+
+    /// <summary>
+    /// Drag intensity - slows down particles
+    /// </summary>
+    [SerializeField] public float                       Drag;
 
     /// <summary>
     /// Environmental ForceField stuff (walls, attractors, repulsors)
@@ -248,7 +253,7 @@ public class CPS : MonoBehaviour
 
 
     public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 73;
+    public static int           GlobalStateSizeInFloat  = 74;
     public static float         MinimalParticleLifetime = 0.1f;
 
     /// <summary>
@@ -375,7 +380,8 @@ public class CPS : MonoBehaviour
 
         // Set environment-related values
         Simulator.SetVector ("EmitterPositionWS",       tf.position                             );
-        Simulator.SetFloat  ("GravityForce",            UseGravity ? -9.81f : 0                 );
+        Simulator.SetFloat  ("GravityForce",            Gravity                                 );
+        Simulator.SetFloat  ("DragForce",               Drag                                    );                      
 
         // Set lifetime-related values
         Simulator.SetInt    ("LifetimeScalarType",      (int)StartLifetimeGenerator.Type        );
@@ -400,11 +406,7 @@ public class CPS : MonoBehaviour
         Simulator.SetVector ("ExactStartScale",         StartScaleGenerator.ExactScalar         );
         Simulator.SetVector ("BottomStartScale",        StartScaleGenerator.BottomScalar        );
         Simulator.SetVector ("TopStartScale",           StartScaleGenerator.TopScalar           );
-        Simulator.SetInt    ("UseEndScale",             UseEndScale ? 1 : 0                     );               
-
-        // TODO: FIX!
-        BillboardRenderParams.matProps.SetInteger("UseEndScale", UseEndScale ? 1 : 0            );
-        MeshRenderParams.matProps.SetInteger("UseEndScale", UseEndScale ? 1 : 0                 );
+        Simulator.SetInt    ("UseEndScale",             UseEndScale ? 1 : 0                     );
 
         Simulator.SetInt    ("EndScaleScalarType",      (int)EndScaleGenerator.Type             );
         Simulator.SetInt    ("UniformEndScale",         EndScaleGenerator.Uniform ? 1 : 0       );
@@ -423,6 +425,11 @@ public class CPS : MonoBehaviour
         Simulator.SetVector ("ExactColour",             StartColourGenerator.ExactScalar        );
         Simulator.SetVector ("BottomColour",            StartColourGenerator.BottomScalar       );
         Simulator.SetVector ("TopColour",               StartColourGenerator.TopScalar          );
+
+        // SHADER VALUES
+        BillboardRenderParams.matProps.SetInteger ("UseEndScale", UseEndScale ? 1 : 0           );
+        MeshRenderParams.matProps.SetInteger      ("UseEndScale", UseEndScale ? 1 : 0           );
+
     }
 
     void SynchronizeCounters()
@@ -517,10 +524,10 @@ public class CPS : MonoBehaviour
     {
         Simulator = Instantiate(SimulatorTemplate);
 
+        Simulator.SetConstantBuffer("GlobalStateBuffer", GlobalStateBuffer, 0, GlobalStateSizeInFloat * sizeof(float));
         foreach(SimulatorKernelType kernel in Enum.GetValues(typeof(SimulatorKernelType)))
         {
             Simulator.SetBuffer((int)kernel, "SimulationStateBuffer",       SimulationStateBuffer       );
-            Simulator.SetBuffer((int)kernel, "GlobalStateBuffer",           GlobalStateBuffer           );
             Simulator.SetBuffer((int)kernel, "CurrentParticleCountBuffer",  CurrentParticleCountBuffer  );
             Simulator.SetBuffer((int)kernel, "EmissionAmountCounterBuffer", EmissionAmountCounterBuffer );
         }
@@ -528,20 +535,22 @@ public class CPS : MonoBehaviour
 
     void InitializeRenderContext()
     {
-        BillboardRenderParams                      = new RenderParams(Instantiate(BillboardMaterialTemplate));
-        BillboardRenderParams.worldBounds          = new Bounds(Vector3.zero, 10000*Vector3.one);
-        BillboardRenderParams.matProps             = new MaterialPropertyBlock();
-        BillboardRenderParams.matProps.SetBuffer   ("SimulationStateBuffer", SimulationStateBuffer );
-        BillboardRenderParams.matProps.SetBuffer   ("GlobalStateBuffer",     GlobalStateBuffer     );
-        BillboardRenderParams.matProps.SetTexture  ("_BillboardTexture",     BillboardTexture      );
+        BillboardRenderParams                            = new RenderParams(Instantiate(BillboardMaterialTemplate));
+        BillboardRenderParams.worldBounds                = new Bounds(Vector3.zero, 10000*Vector3.one);
+        BillboardRenderParams.matProps                   = new MaterialPropertyBlock();
+
+        BillboardRenderParams.matProps.SetBuffer         ("SimulationStateBuffer", SimulationStateBuffer                                        );
+        BillboardRenderParams.matProps.SetConstantBuffer ("GlobalStateBuffer",     GlobalStateBuffer, 0, GlobalStateSizeInFloat * sizeof(float) );
+        BillboardRenderParams.matProps.SetTexture        ("_BillboardTexture",     BillboardTexture                                             );
         
-        MeshRenderParams                           = new RenderParams(Instantiate(MeshMaterialTemplate));
-        MeshRenderParams.worldBounds               = new Bounds(Vector3.zero, 10000*Vector3.one);
-        MeshRenderParams.material.enableInstancing = true;
-        MeshRenderParams.matProps                  = new MaterialPropertyBlock();
-        MeshRenderParams.matProps.SetBuffer        ("SimulationStateBuffer", SimulationStateBuffer );
-        MeshRenderParams.matProps.SetBuffer        ("GlobalStateBuffer",     GlobalStateBuffer     );
-        MeshRenderParams.matProps.SetTexture       ("_BillboardTexture",     BillboardTexture      );
+        MeshRenderParams                                 = new RenderParams(Instantiate(MeshMaterialTemplate)                                   );
+        MeshRenderParams.worldBounds                     = new Bounds(Vector3.zero, 10000*Vector3.one                                           );
+        MeshRenderParams.material.enableInstancing       = true;
+        MeshRenderParams.matProps                        = new MaterialPropertyBlock();
+
+        MeshRenderParams.matProps.SetBuffer              ("SimulationStateBuffer", SimulationStateBuffer                                        );
+        MeshRenderParams.matProps.SetConstantBuffer      ("GlobalStateBuffer",     GlobalStateBuffer, 0, GlobalStateSizeInFloat * sizeof(float) );
+        MeshRenderParams.matProps.SetTexture             ("_BillboardTexture",     BillboardTexture                                             );
     }
 
     int _dispatchNum = -1;
@@ -962,7 +971,8 @@ public class CPSEditor : Editor
     // Simulation properties
     SerializedProperty _MaximumParticleCount;
     SerializedProperty _EmissionRate;
-    SerializedProperty _UseGravity;
+    SerializedProperty _Gravity;
+    SerializedProperty _Drag;
 
     void OnEnable()
     {
@@ -998,7 +1008,8 @@ public class CPSEditor : Editor
 
         _MaximumParticleCount       = _CPS.FindProperty("MaximumParticleCount");
         _EmissionRate               = _CPS.FindProperty("EmissionRate");
-        _UseGravity                 = _CPS.FindProperty("UseGravity");
+        _Gravity                    = _CPS.FindProperty("Gravity");
+        _Drag                       = _CPS.FindProperty("Drag");
     }
 
     CPS Target { get => target as CPS; }
@@ -1078,9 +1089,12 @@ public class CPSEditor : Editor
         EditorGUILayout.PropertyField(_EmissionRate);
         _EmissionRate.floatValue = Mathf.Clamp(_EmissionRate.floatValue, 0, CPS.HARD_LIMIT);
 
-        HorizontalSeparator();
+    HorizontalSeparator();
         
-        EditorGUILayout.PropertyField(_UseGravity);
+        EditorGUILayout.PropertyField(_Gravity);
+
+        EditorGUILayout.PropertyField(_Drag);
+        _Drag.floatValue = Mathf.Clamp(_Drag.floatValue, 0.0f, 1.0f);
     }
 
     public override void OnInspectorGUI()

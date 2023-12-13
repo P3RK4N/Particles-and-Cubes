@@ -59,6 +59,7 @@ cbuffer GlobalState
     // Environment Stuff
     float3 EmitterPositionWS;
     float GravityForce;
+    float DragForce;
     
     // Lifetime
     int LifetimeScalarType;
@@ -538,8 +539,14 @@ void MockTick(uint3 id : SV_DispatchThreadID)
     // Age it
     SimulationStateBuffer[ID].Current_Max_Life.x -= DeltaTime;
     
-    // Apply external force
+    // Apply external force - Gravity
     SimulationStateBuffer[ID].ExternalVelocity.y += GravityForce * DeltaTime;
+    
+    // Apply Drag to velocity
+    // NOTE: Drag will be linear by velocity since there are 2 separate velocity components
+    float drag = DragForce * DeltaTime;
+    SimulationStateBuffer[ID].Velocity          -= drag * SimulationStateBuffer[ID].Velocity;
+    SimulationStateBuffer[ID].ExternalVelocity  -= drag * SimulationStateBuffer[ID].ExternalVelocity;
     
     // Apply velocity
     SimulationStateBuffer[ID].Position += DeltaTime *

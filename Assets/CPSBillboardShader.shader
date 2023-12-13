@@ -79,6 +79,7 @@ Shader "Unlit/CPSBillboardShader"
                 // Environment Stuff
                 float3 EmitterPositionWS;
                 float GravityForce;
+                float DragForce;
     
                 // Lifetime
                 int LifetimeScalarType;
@@ -124,7 +125,7 @@ Shader "Unlit/CPSBillboardShader"
                 float3 TopColour;
     
                 // TODO: Expand new ones
-            };
+            }; 
 
             struct GEOM_IN
             {
@@ -223,7 +224,6 @@ Shader "Unlit/CPSBillboardShader"
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;
                 float3 scale    = UseEndScale ? lerp(SimulationStateBuffer[id].StartScale, SimulationStateBuffer[id].EndScale, p) : SimulationStateBuffer[id].StartScale;
-                // float3 scale    = UseEndScale == 1 ? SimulationStateBuffer[id].EndScale : SimulationStateBuffer[id].StartScale;
                 
                 // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
                 // transform their positions? Stretching doesnt seem right (eg. Particles at the extreme positions will have

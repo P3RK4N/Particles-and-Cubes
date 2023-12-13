@@ -4,6 +4,12 @@ using UnityEngine;
 using System;
 using Unity.VisualScripting;
 using static UnityEngine.GraphicsBuffer;
+using UnityEngine.Assertions;
+using System.Linq;
+using static UnityEngine.Rendering.DebugUI;
+
+
+
 
 
 #if UNITY_EDITOR
@@ -108,8 +114,8 @@ public class CPS : MonoBehaviour
     {
         [SerializeField] public FalloffType Type;
         [SerializeField] public float Intensity;
-        [SerializeField] public Vector3 Coefficients;
-        [SerializeField] FunctionGenerator Generator;
+        [SerializeField] public Vector4 Coefficients;
+        [SerializeField] public FunctionGenerator Generator;
     }
 
 
@@ -246,14 +252,24 @@ public class CPS : MonoBehaviour
     /// <summary>
     /// Environmental ForceField stuff (walls, attractors, repulsors)
     /// </summary>
-    [SerializeField] public List<ForceFieldDescriptor> ForceFields;
+    [SerializeField] public List<ForceFieldDescriptor>  ForceFields;
+
+    /// <summary>
+    /// Turns ForceFields ON or OFF
+    /// </summary>
+    [SerializeField] public bool                        UseForceFields;
 
 #endregion
 
 
-    public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 96;
-    public static float         MinimalParticleLifetime = 0.1f;
+    public static readonly int      HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
+    public static readonly int      FORCEFIELD_HARD_LIMIT   = 10;
+    public static readonly int      GlobalStateSizeInFloat  = 96;
+    public static readonly float    MinimalParticleLifetime = 0.1f;
+
+    public static readonly Color    StartPositionGizmoColor = Color.blue;
+    public static readonly Color    AttractorColor          = Color.green;
+    public static readonly Color    RepulsorColor           = Color.red;
 
     /// <summary>
     /// CPSSimulator instance
@@ -348,7 +364,8 @@ public class CPS : MonoBehaviour
         if
         (
             Application.isPlaying &&
-            tf != null
+            tf != null            &&
+            Simulator != null
         )
         {
             RefreshGlobalStateBuffer();
@@ -358,10 +375,12 @@ public class CPS : MonoBehaviour
     void OnDrawGizmos()
     {
         if(!DrawGUI) return;
+        if(tf == null) { tf = transform; }
 
-        DrawStartPosition();
+        DrawStartPosition(StartPositionGizmoColor);
+        DrawForceFields(AttractorColor, RepulsorColor);
     }
-    
+
     void RefreshGlobalStateBuffer()
     {
         // Set Settings Stuff
@@ -439,6 +458,33 @@ public class CPS : MonoBehaviour
         MeshRenderParams.matProps.SetInteger      ("UseEndScale",  UseEndScale ? 1 : 0          );
         BillboardRenderParams.matProps.SetInteger ("UseEndColour", UseEndColour ? 1 : 0         );
         MeshRenderParams.matProps.SetInteger      ("UseEndColour", UseEndColour ? 1 : 0         );
+
+        // FORCEFIELD VALUES
+        if(ForceFields.Count > FORCEFIELD_HARD_LIMIT)
+        {
+            Debug.LogWarning($"ForceField count cannot exceed {FORCEFIELD_HARD_LIMIT}!");
+            ForceFields.RemoveRange(FORCEFIELD_HARD_LIMIT, ForceFields.Count - FORCEFIELD_HARD_LIMIT);
+        }
+
+        Simulator.SetInt            ("UseForceFields",                      UseForceFields ? 1 : 0);
+        Simulator.SetInt            ("ForceFieldsCount",                    ForceFields.Count);
+        Simulator.SetInts           ("ForceFieldTypes",                     ForceFields.ConvertAll(descriptor => (int)descriptor.Type).ToArray());
+        Simulator.SetInts           ("ForceFieldGeneratorTypes",            ForceFields.ConvertAll(descriptor => (int)descriptor.Generator.Type).ToArray());
+        Simulator.SetFloats         ("ForceFieldIntensities",               ForceFields.ConvertAll(descriptor => descriptor.Intensity).ToArray());
+        Simulator.SetVectorArray    ("ForceFieldGeneratorCenterOffsets",    ForceFields.ConvertAll
+        (
+            descriptor =>
+            {
+                var pos = descriptor.Generator.CenterOffset;
+                return (Vector4)(SimulationSpace == SimulationSpaceType.Global
+                            ? tf.position + pos
+                            : tf.localToWorldMatrix * new Vector4(pos.x, pos.y, pos.z, 1));
+            }
+        ).ToArray());
+        Simulator.SetVectorArray    ("ForceFieldCoefficients",              ForceFields.ConvertAll
+        (
+            descriptor => new Vector4(descriptor.Coefficients.x, descriptor.Coefficients.y, descriptor.Coefficients.z, 0)
+        ).ToArray());
     }
 
     void SynchronizeCounters()
@@ -581,23 +627,57 @@ public class CPS : MonoBehaviour
         throw new Exception("Not happening!");
     }
     
-    void DrawStartPosition()
+    void DrawStartPosition(Color col)
     {
+        var prevCol = Gizmos.color;
+        Gizmos.color = col;
+        
+        var pos = StartPositionGenerator.CenterOffset;
+        pos = SimulationSpace == SimulationSpaceType.Global ? tf.position + pos : tf.localToWorldMatrix * new Vector4(pos.x, pos.y, pos.z, 1);
+        // Assuming uniform scale. Otherwise need to render elipsoid
+        var radius = SimulationSpace == SimulationSpaceType.Global ? StartPositionGenerator.Radius : StartPositionGenerator.Radius * tf.lossyScale.x;
+
         switch(StartPositionGenerator.Type)
         {
             case FunctionGeneratorType.Point:
             {
-                DebugExtension.DrawPoint(transform.position + StartPositionGenerator.CenterOffset, 0.3f); break;
+                DebugExtension.DrawPoint(pos, col, 0.3f); break;
             }
             case FunctionGeneratorType.Sphere:
             {
-                Gizmos.DrawWireSphere(transform.position + StartPositionGenerator.CenterOffset, StartPositionGenerator.Radius); break;
+                DebugExtension.DrawPoint(pos, col, 0.3f);
+                Gizmos.DrawWireSphere(pos, radius); break;
             }
             case FunctionGeneratorType.Cuboid:
             case FunctionGeneratorType.Plane:
             default:
             {
                 break;
+            }
+        }
+
+        Gizmos.color = prevCol;
+    }
+
+    void DrawForceFields(Color attractorColor, Color repulsorColor)
+    {
+        foreach(var ffield  in ForceFields)
+        {
+            var col = ffield.Intensity >= 0.0f ? attractorColor : repulsorColor;
+            var pos = ffield.Generator.CenterOffset;
+            pos = SimulationSpace == SimulationSpaceType.Global ? tf.position + pos : tf.localToWorldMatrix * new Vector4(pos.x, pos.y, pos.z, 1);
+
+            switch(ffield.Generator.Type)
+            {
+                case FunctionGeneratorType.Point:
+                {
+                    DebugExtension.DrawPoint(pos, col, Mathf.Abs(ffield.Intensity));
+                    break;
+                }
+                default:
+                {
+                    break;
+                }
             }
         }
     }
@@ -674,7 +754,11 @@ public class CPSEditor : Editor
             SubMenuStyle.padding    = new RectOffset(0, 0, 0, 0);
             SubMenuStyle.border     = new RectOffset(0, 0, 0, 0);
         }
-        if(bgColor != null) SubMenuStyle.normal.background = MakeTex(1, 1, bgColor);
+        if(bgColor != null)
+        {
+            SubMenuStyle.normal.background = MakeTex(1, 1, bgColor);
+            //SubMenuStyle.
+        }
 
         return SubMenuStyle;
     }
@@ -989,6 +1073,10 @@ public class CPSEditor : Editor
     SerializedProperty _Gravity;
     SerializedProperty _Drag;
 
+    SerializedProperty _ForceFields;
+    SerializedProperty _UseForceFields;
+
+
     void OnEnable()
     {
         // NOTE: Can be automatized with reflection
@@ -1028,6 +1116,9 @@ public class CPSEditor : Editor
         _EmissionRate               = _CPS.FindProperty("EmissionRate");
         _Gravity                    = _CPS.FindProperty("Gravity");
         _Drag                       = _CPS.FindProperty("Drag");
+
+        _ForceFields                = _CPS.FindProperty("ForceFields");
+        _UseForceFields             = _CPS.FindProperty("UseForceFields");
     }
 
     CPS Target { get => target as CPS; }
@@ -1066,43 +1157,43 @@ public class CPSEditor : Editor
 
     void PropertiesSubMenu()
     {
-        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime",       new Vector2(CPS.MinimalParticleLifetime, float.MaxValue)             );
+        ManipulateScalarGenerator1D(_StartLifetimeGenerator, "Lifetime", new Vector2(CPS.MinimalParticleLifetime, float.MaxValue));
 
     HorizontalSeparator();
 
-        ManipulateFunctionGenerator(_StartPositionGenerator,  "Start Position"                                                                       );
+        ManipulateFunctionGenerator(_StartPositionGenerator, "Start Position");
 
     HorizontalSeparator();
 
-        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale",    new Vector2(float.Epsilon, float.MaxValue)                           );
+        ManipulateScalarGenerator3D(_StartScaleGenerator, "Start Scale", new Vector2(float.Epsilon, float.MaxValue));
         EditorGUILayout.PropertyField(_UseEndScale, true);
         if(_UseEndScale.boolValue)
         {
-            ManipulateScalarGenerator3D(_EndScaleGenerator,   "End Scale",      new Vector2(float.Epsilon, float.MaxValue)                           );
+            ManipulateScalarGenerator3D(_EndScaleGenerator, "End Scale", new Vector2(float.Epsilon, float.MaxValue));
         }
 
     HorizontalSeparator();
 
         Disabled((CPS.ParticleRenderType)_RenderType.enumValueIndex != CPS.ParticleRenderType.Mesh, () =>
         {
-            ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"                                                                    );
+            ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation");
         });
         Disabled((CPS.ParticleRenderType)_RenderType.enumValueIndex != CPS.ParticleRenderType.Mesh, () =>
         {
-            ManipulateScalarGenerator3D(_RotationOverTimeGenerator, "Rotation Over Time"                                                             );
+            ManipulateScalarGenerator3D(_RotationOverTimeGenerator, "Rotation Over Time");
         });
 
     HorizontalSeparator();
 
-        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity", null                                                                 );
+        ManipulateScalarGenerator3D(_StartVelocityGenerator, "Start Velocity", null);
 
     HorizontalSeparator();
 
-        ManipulateScalarGenerator3D(_StartColourGenerator,    "Start Colour",   new Vector2(0.0f, 1.0f)                                              );
+        ManipulateScalarGenerator3D(_StartColourGenerator, "Start Colour", new Vector2(0.0f, 1.0f));
         EditorGUILayout.PropertyField(_UseEndColour, true);
         if(_UseEndColour.boolValue)
         {
-            ManipulateScalarGenerator3D(_EndColourGenerator,   "End Colour",     new Vector2(0.0f, 1.0f)                                             );
+            ManipulateScalarGenerator3D(_EndColourGenerator, "End Colour", new Vector2(0.0f, 1.0f));
         }
     }
 
@@ -1125,6 +1216,11 @@ public class CPSEditor : Editor
 
         EditorGUILayout.PropertyField(_Drag);
         _Drag.floatValue = Mathf.Clamp(_Drag.floatValue, 0.0f, 1.0f);
+
+    HorizontalSeparator();
+
+        EditorGUILayout.PropertyField(_UseForceFields);
+        Disabled(!_UseForceFields.boolValue, () => EditorGUILayout.PropertyField(_ForceFields, true));
     }
 
     public override void OnInspectorGUI()

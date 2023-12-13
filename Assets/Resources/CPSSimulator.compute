@@ -3,7 +3,8 @@
 #pragma kernel MockTick
 #pragma kernel MockEmit
 
-#define CPS_GROUP_SIZE 32
+#define CPS_GROUP_SIZE           32
+#define CPS_MAX_FORCEFIELD_COUNT 10
 
 static const int LOCAL_SPACE        = 0;
 static const int GLOBAL_SPACE       = 1;
@@ -115,12 +116,21 @@ cbuffer GlobalState
     float3 ExactEndColour;
     float3 BottomEndColour;
     float3 TopEndColour;
-    
-    // TODO: Expand new ones
-}; 
+};
+
+// TODO: Make it compatible with options GLOBAL and LOCAL SPACE
+uniform int     UseForceFields;
+uniform int     ForceFieldsCount;
+uniform int     ForceFieldTypes                  [CPS_MAX_FORCEFIELD_COUNT];
+uniform int     ForceFieldGeneratorTypes         [CPS_MAX_FORCEFIELD_COUNT];
+uniform float   ForceFieldIntensities            [CPS_MAX_FORCEFIELD_COUNT];
+uniform float3  ForceFieldGeneratorCenterOffsets [CPS_MAX_FORCEFIELD_COUNT];
+uniform float4  ForceFieldCoefficients           [CPS_MAX_FORCEFIELD_COUNT];
 
 RWStructuredBuffer<int>  CurrentParticleCountBuffer;
 RWStructuredBuffer<int>  EmissionAmountCounterBuffer;
+
+static const float FalloffPowers[4] = { 0.5, 1, 2, 3 };
 
 /*
     ##############################################################
@@ -517,6 +527,30 @@ void ResetParticle(uint ID)
 
 #endif
 
+void UpdateExternalVelocity(uint ID)
+{
+    // Gravity
+    SimulationStateBuffer[ID].ExternalVelocity.y += GravityForce * DeltaTime;
+    
+    // Force Fields
+    [unroll]
+    for (int i = 0; i < CPS_MAX_FORCEFIELD_COUNT; i++)
+    {
+        if (i >= ForceFieldsCount || UseForceFields == 0)
+            break;
+
+        float3 dir = ForceFieldGeneratorCenterOffsets[i] - SimulationStateBuffer[ID].Position;
+        float distLin = length(dir);
+        
+        SimulationStateBuffer[ID].ExternalVelocity +=
+            + ForceFieldCoefficients[i][ForceFieldTypes[i]]
+            * pow(distLin, FalloffPowers[ForceFieldTypes[i]])
+            * ForceFieldIntensities[i]
+            * DeltaTime
+            * normalize(dir);
+    }
+}
+
 [numthreads(CPS_GROUP_SIZE, CPS_GROUP_SIZE, 1)]
 void MockInit(uint3 id : SV_DispatchThreadID)
 {
@@ -584,8 +618,7 @@ void MockTick(uint3 id : SV_DispatchThreadID)
     // Rotate it
     SimulationStateBuffer[ID].Rotation += SimulationStateBuffer[ID].RotationOverTime * DeltaTime;
     
-    // Apply external force - Gravity
-    SimulationStateBuffer[ID].ExternalVelocity.y += GravityForce * DeltaTime;
+    UpdateExternalVelocity(ID);
     
     // Apply Drag to velocity
     // NOTE: Drag will be linear by velocity since there are 2 separate velocity components

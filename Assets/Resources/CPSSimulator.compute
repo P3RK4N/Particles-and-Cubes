@@ -3,7 +3,7 @@
 #pragma kernel MockTick
 #pragma kernel MockEmit
 
-#define GROUP_SIZE 32
+#define CPS_GROUP_SIZE 32
 
 static const int LOCAL_SPACE        = 0;
 static const int GLOBAL_SPACE       = 1;
@@ -29,7 +29,8 @@ static const int FALLOFF_CUBOID     = 3;
 struct SimulationState
 {
     float3  Position;
-    float3  Scale;
+    float3  StartScale;
+    float3  EndScale;
     float3  Rotation;
     float3  Velocity;
     float3  ExternalVelocity;
@@ -59,8 +60,6 @@ cbuffer GlobalState
     float3 EmitterPositionWS;
     float GravityForce;
     
-    // TODO: Expand existing ones
- 
     // Lifetime
     int LifetimeScalarType;
     float ExactLifetime;
@@ -79,11 +78,18 @@ cbuffer GlobalState
     float3 TopVelocity;
     
     // Scale
-    int ScaleScalarType;
-    int UniformScale;
-    float3 ExactScale;
-    float3 BottomScale;
-    float3 TopScale;
+    int StartScaleScalarType;
+    int UniformStartScale;
+    float3 ExactStartScale;
+    float3 BottomStartScale;
+    float3 TopStartScale;
+    int UseEndScale;
+    int EndScaleScalarType;
+    int UniformEndScale;
+    float3 ExactEndScale;
+    float3 BottomEndScale;
+    float3 TopEndScale;
+    
     
     // Rotation
     int RotationScalarType;
@@ -100,10 +106,8 @@ cbuffer GlobalState
     // TODO: Expand new ones
 }; 
 
-RWStructuredBuffer<int>             CurrentParticleCountBuffer;
-RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
-
-// TODO: Fix PRNG functions
+RWStructuredBuffer<int>  CurrentParticleCountBuffer;
+RWStructuredBuffer<int>  EmissionAmountCounterBuffer;
 
 /*
     ##############################################################
@@ -111,8 +115,8 @@ RWStructuredBuffer<int>             EmissionAmountCounterBuffer;
     ##############################################################
 */
 
-#ifndef SHADERTOY_HASH_FUNCTIONS
-#define SHADERTOY_HASH_FUNCTIONS
+#ifndef CPS_SHADERTOY_HASH_FUNCTIONS
+#define CPS_SHADERTOY_HASH_FUNCTIONS
 
 /*
     Hash Functions for GPU Rendering
@@ -303,6 +307,9 @@ float3 randvec(float seed)
     ##############################################################
 */
 
+#ifndef CPS_RNG_UTILITY
+#define CPS_RNG_UTILITY
+
 float3 RandomRange(in float3 prev, in float3 bottom, in float3 top, in uint ID, in bool isUniform)
 {
     float3 diff = top - bottom;
@@ -327,20 +334,42 @@ float3 RandomVector(in float3 prev, in uint ID)
 
 }
 
+#endif
+
+
+#ifndef CPS_PARTICLE_RESET
+#define CPS_PARTICLE_RESET
+
 void ResetScale(uint ID)
 {
-    if(ScaleScalarType == SCALAR_EXACT)
+    if(StartScaleScalarType == SCALAR_EXACT)
     {
-        SimulationStateBuffer[ID].Scale = ExactScale;
+        SimulationStateBuffer[ID].StartScale = ExactStartScale;
     }
-    else if(ScaleScalarType == SCALAR_RANGED)
+    else if(StartScaleScalarType == SCALAR_RANGED)
     {
-        SimulationStateBuffer[ID].Scale = RandomRange(SimulationStateBuffer[ID].Scale, BottomScale, TopScale, ID, UniformScale);
+        SimulationStateBuffer[ID].StartScale = RandomRange(SimulationStateBuffer[ID].StartScale, BottomStartScale, TopStartScale, ID, UniformStartScale);
     }
     else
     {
         // TODO
     }
+    
+    if(UseEndScale == 0) return;
+
+    if(EndScaleScalarType == SCALAR_EXACT)
+    {
+        SimulationStateBuffer[ID].EndScale = ExactEndScale;
+    }
+    else if (EndScaleScalarType == SCALAR_RANGED)
+    {
+        SimulationStateBuffer[ID].EndScale = RandomRange(SimulationStateBuffer[ID].EndScale, BottomEndScale, TopEndScale, ID, UniformEndScale);
+    }
+    else
+    {
+        // TODO
+    }
+    
 }
 
 void ResetPosition(uint ID)
@@ -445,25 +474,28 @@ void ResetParticle(uint ID)
     SimulationStateBuffer[ID].SimSpace_RendType = int2(SimulationSpace, RenderType);
 }
 
-[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+#endif
+
+[numthreads(CPS_GROUP_SIZE, CPS_GROUP_SIZE, 1)]
 void MockInit(uint3 id : SV_DispatchThreadID)
 {
-    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    uint ID = id.x + id.y * DISPATCH_NUM * CPS_GROUP_SIZE;
     if((int)ID >= MAX_PARTICLE_COUNT) return;
     
-    SimulationStateBuffer[ID].Position  = HashNoSine31(PseudoHash(uint2(ID, Seed + 1       )));
-    SimulationStateBuffer[ID].Scale     = HashNoSine31(PseudoHash(uint2(ID, Seed + 121     )));
-    SimulationStateBuffer[ID].Rotation  = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321   )));
-    SimulationStateBuffer[ID].Velocity  = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321 )));
-    SimulationStateBuffer[ID].Colour    = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 )));
+    SimulationStateBuffer[ID].Position      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1       )));
+    SimulationStateBuffer[ID].StartScale    = HashNoSine31(PseudoHash(uint2(ID, Seed + 121     )));
+    SimulationStateBuffer[ID].EndScale      = HashNoSine31(PseudoHash(uint2(ID, Seed + 212     )));
+    SimulationStateBuffer[ID].Rotation      = HashNoSine31(PseudoHash(uint2(ID, Seed + 12321   )));
+    SimulationStateBuffer[ID].Velocity      = HashNoSine31(PseudoHash(uint2(ID, Seed + 1234321 )));
+    SimulationStateBuffer[ID].Colour        = HashNoSine31(PseudoHash(uint2(ID, Seed + 4321234 )));
     
     SimulationStateBuffer[ID].Current_Max_Life  = 0.0f;
 }
 
-[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+[numthreads(CPS_GROUP_SIZE, CPS_GROUP_SIZE, 1)]
 void MockEmit(uint3 id : SV_DispatchThreadID)
 {
-    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    uint ID = id.x + id.y * DISPATCH_NUM * CPS_GROUP_SIZE;
     if
     (
         // Out of scope
@@ -489,10 +521,10 @@ void MockEmit(uint3 id : SV_DispatchThreadID)
     ResetParticle(ID);
 }
 
-[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+[numthreads(CPS_GROUP_SIZE, CPS_GROUP_SIZE, 1)]
 void MockTick(uint3 id : SV_DispatchThreadID)
 {
-    uint ID = id.x + id.y * DISPATCH_NUM * GROUP_SIZE;
+    uint ID = id.x + id.y * DISPATCH_NUM * CPS_GROUP_SIZE;
     if
     (
         // Out of scope
@@ -512,7 +544,7 @@ void MockTick(uint3 id : SV_DispatchThreadID)
     // Apply velocity
     SimulationStateBuffer[ID].Position += DeltaTime *
     (
-        SimulationStateBuffer[ID].Velocity
+        + SimulationStateBuffer[ID].Velocity
         + SimulationStateBuffer[ID].ExternalVelocity
     );
     

@@ -46,7 +46,8 @@ Shader "Unlit/CPSMeshShader"
             struct SimulationState
             {
                 float3  Position;
-                float3  Scale;
+                float3  StartScale;
+                float3  EndScale;
                 float3  Rotation;
                 float3  Velocity;
                 float3  ExternalVelocity;
@@ -63,7 +64,7 @@ Shader "Unlit/CPSMeshShader"
                 int Seed;
                 int SimulationSpace;
                 int RenderType;
-
+    
                 // Kernel Stuff
                 int DISPATCH_NUM;
                 int MAX_PARTICLE_COUNT;
@@ -74,11 +75,8 @@ Shader "Unlit/CPSMeshShader"
 
                 // Environment Stuff
                 float3 EmitterPositionWS;
-
                 float GravityForce;
     
-                // TODO: Expand existing ones
- 
                 // Lifetime
                 int LifetimeScalarType;
                 float ExactLifetime;
@@ -97,11 +95,18 @@ Shader "Unlit/CPSMeshShader"
                 float3 TopVelocity;
     
                 // Scale
-                int ScaleScalarType;
-                int UniformScale;
-                float3 ExactScale;
-                float3 BottomScale;
-                float3 TopScale;
+                int StartScaleScalarType;
+                int UniformStartScale;
+                float3 ExactStartScale;
+                float3 BottomStartScale;
+                float3 TopStartScale;
+                int UseEndScale;
+                int EndScaleScalarType;
+                int UniformEndScale;
+                float3 ExactEndScale;
+                float3 BottomEndScale;
+                float3 TopEndScale;
+    
     
                 // Rotation
                 int RotationScalarType;
@@ -109,8 +114,14 @@ Shader "Unlit/CPSMeshShader"
                 float3 BottomRotation;
                 float3 TopRotation;
     
+                // Colour
+                int ColourScalarType;
+                float3 ExactColour;
+                float3 BottomColour;
+                float3 TopColour;
+    
                 // TODO: Expand new ones
-            };
+            }; 
 
             struct VERT_IN
             {
@@ -199,18 +210,24 @@ Shader "Unlit/CPSMeshShader"
             FRAG_IN vert (VERT_IN IN, uint InstanceID: SV_InstanceID)
             {
                 FRAG_IN OUT = (FRAG_IN)0;
+                uint id = InstanceID;
                 OUT.Drop = 0;
 
-                if(SimulationStateBuffer[InstanceID].Current_Max_Life.x <= 0)
+                float2 Current_Max_Life = SimulationStateBuffer[id].Current_Max_Life;
+
+                if(Current_Max_Life.x <= 0)
                 {
                     OUT.Drop = 1;
                     return OUT;
                 }
 
-                int space       = SimulationStateBuffer[InstanceID].SimSpace_RendType[0];
-                float3 pos      = SimulationStateBuffer[InstanceID].Position;
-                float3 rot      = SimulationStateBuffer[InstanceID].Rotation;
-                float3 scale    = SimulationStateBuffer[InstanceID].Scale;
+                float p         = (Current_Max_Life.y - Current_Max_Life.x) / Current_Max_Life.y;
+                int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
+                float3 pos      = SimulationStateBuffer[id].Position;
+                float3 rot      = SimulationStateBuffer[id].Rotation;
+                float3 scale    = UseEndScale ? lerp(SimulationStateBuffer[id].StartScale, SimulationStateBuffer[id].EndScale, p) : SimulationStateBuffer[id].StartScale;
+                // float3 scale    = UseEndScale == 1 ? SimulationStateBuffer[id].EndScale : SimulationStateBuffer[id].StartScale;
+
 
                 // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
                 // transform their positions? Stretching doesnt seem right (eg. Particles at the extreme positions will have
@@ -233,7 +250,7 @@ Shader "Unlit/CPSMeshShader"
 
                 OUT.PositionCS  = UnityWorldToClipPos(positionWS);
                 OUT.UV          = IN.UV;
-                OUT.Colour      = half4(SimulationStateBuffer[InstanceID].Colour, 1);
+                OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
                 OUT.Normal      = IN.Normal;
                 OUT.PositionWS  = positionWS.xyz;
 

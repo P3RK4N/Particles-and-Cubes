@@ -175,9 +175,9 @@ public class CPS : MonoBehaviour
 #region Start Fields
 
     /// <summary>
-    /// Initial velocity stuff
+    /// Initial position stuff (Shape in which particles generate)
     /// </summary>
-    [SerializeField] public ScalarGenerator<Vector3>    StartVelocityGenerator;
+    [SerializeField] public FunctionGenerator           StartPositionGenerator;
 
     /// <summary>
     /// Initial lifetime stuff
@@ -185,24 +185,30 @@ public class CPS : MonoBehaviour
     [SerializeField] public ScalarGenerator<float>      StartLifetimeGenerator;
 
     /// <summary>
+    /// Initial velocity stuff
+    /// </summary>
+    [SerializeField] public ScalarGenerator<Vector3>    StartVelocityGenerator;
+
+    /// <summary>
     /// Initial size stuff
     /// </summary>
     [SerializeField] public ScalarGenerator<Vector3>    StartScaleGenerator;
+    [SerializeField] public bool                        UseEndScale;
+    [SerializeField] public ScalarGenerator<Vector3>    EndScaleGenerator;
 
     /// <summary>
     /// Initial rotation stuff
     /// </summary>
     [SerializeField] public ScalarGenerator<Vector3>    StartRotationGenerator;
-
-    /// <summary>
-    /// Initial position stuff (Shape in which particles generate)
-    /// </summary>
-    [SerializeField] public FunctionGenerator           StartPositionGenerator;
+    [SerializeField] public bool                        RotationOverTime;
+    [SerializeField] public ScalarGenerator<Vector3>    RotationOverTimeGenerator;
 
     /// <summary>
     /// Initial colour stuff
     /// </summary>
     [SerializeField] public ScalarGenerator<Vector3>    StartColourGenerator;
+    [SerializeField] public bool                        EndColour;
+    [SerializeField] public ScalarGenerator<Vector3>    EndColourGenerator;
 
 #endregion
 
@@ -242,7 +248,7 @@ public class CPS : MonoBehaviour
 
 
     public static readonly int  HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
-    public static int           GlobalStateSizeInFloat  = 61;
+    public static int           GlobalStateSizeInFloat  = 73;
     public static float         MinimalParticleLifetime = 0.1f;
 
     /// <summary>
@@ -355,57 +361,68 @@ public class CPS : MonoBehaviour
     void RefreshGlobalStateBuffer()
     {
         // Set Settings Stuff
-        Simulator.SetInt    ("Seed",                    ((int)Seed));
-        Simulator.SetInt    ("SimulationSpace",         ((int)SimulationSpace));
-        Simulator.SetInt    ("RenderType",              ((int)RenderType));
+        Simulator.SetInt    ("Seed",                    (int)Seed                               );
+        Simulator.SetInt    ("SimulationSpace",         (int)SimulationSpace                    );
+        Simulator.SetInt    ("RenderType",              (int)RenderType                         );
         
         // Set kernel-related values
-        Simulator.SetInt    ("DISPATCH_NUM",            GetDispatchNum());
-        Simulator.SetInt    ("MAX_PARTICLE_COUNT",      MaximumParticleCount);
+        Simulator.SetInt    ("DISPATCH_NUM",            GetDispatchNum()                        );
+        Simulator.SetInt    ("MAX_PARTICLE_COUNT",      MaximumParticleCount                    );
 
         // Set time-related values
-        Simulator.SetFloat  ("DeltaTime",               Time.deltaTime);
-        Simulator.SetFloat  ("Time",                    Time.time);
+        Simulator.SetFloat  ("DeltaTime",               Time.deltaTime                          );
+        Simulator.SetFloat  ("Time",                    Time.time                               );
 
         // Set environment-related values
-        Simulator.SetVector ("EmitterPositionWS",       tf.position);
-        Simulator.SetFloat  ("GravityForce",            UseGravity ? -9.81f : 0);
+        Simulator.SetVector ("EmitterPositionWS",       tf.position                             );
+        Simulator.SetFloat  ("GravityForce",            UseGravity ? -9.81f : 0                 );
 
         // Set lifetime-related values
-        Simulator.SetInt    ("LifetimeScalarType",      ((int)StartLifetimeGenerator.Type));
-        Simulator.SetFloat  ("ExactLifetime",           StartLifetimeGenerator.ExactScalar);
-        Simulator.SetFloat  ("BottomLifetime",          StartLifetimeGenerator.BottomScalar);
-        Simulator.SetFloat  ("TopLifetime",             StartLifetimeGenerator.TopScalar);
+        Simulator.SetInt    ("LifetimeScalarType",      (int)StartLifetimeGenerator.Type        );
+        Simulator.SetFloat  ("ExactLifetime",           StartLifetimeGenerator.ExactScalar      );
+        Simulator.SetFloat  ("BottomLifetime",          StartLifetimeGenerator.BottomScalar     );
+        Simulator.SetFloat  ("TopLifetime",             StartLifetimeGenerator.TopScalar        );
 
         // Set position-related values
-        Simulator.SetInt    ("PositionFunctionType",    ((int)StartPositionGenerator.Type));
-        Simulator.SetVector ("CenterOffset",            StartPositionGenerator.CenterOffset);
-        Simulator.SetFloat  ("Radius",                  StartPositionGenerator.Radius);
+        Simulator.SetInt    ("PositionFunctionType",    (int)StartPositionGenerator.Type        );
+        Simulator.SetVector ("CenterOffset",            StartPositionGenerator.CenterOffset     );
+        Simulator.SetFloat  ("Radius",                  StartPositionGenerator.Radius           );
 
         // Set velocity-related values
-        Simulator.SetInt    ("VelocityScalarType",      ((int)StartVelocityGenerator.Type));
-        Simulator.SetVector ("ExactVelocity",           StartVelocityGenerator.ExactScalar);
-        Simulator.SetVector ("BottomVelocity",          StartVelocityGenerator.BottomScalar);
-        Simulator.SetVector ("TopVelocity",             StartVelocityGenerator.TopScalar);
+        Simulator.SetInt    ("VelocityScalarType",      (int)StartVelocityGenerator.Type        );
+        Simulator.SetVector ("ExactVelocity",           StartVelocityGenerator.ExactScalar      );
+        Simulator.SetVector ("BottomVelocity",          StartVelocityGenerator.BottomScalar     );
+        Simulator.SetVector ("TopVelocity",             StartVelocityGenerator.TopScalar        );
 
         // Set scale-related values
-        Simulator.SetInt    ("ScaleScalarType",         ((int)StartScaleGenerator.Type));
-        Simulator.SetInt    ("UniformScale",            StartScaleGenerator.Uniform ? 1 : 0);
-        Simulator.SetVector ("ExactScale",              StartScaleGenerator.ExactScalar);
-        Simulator.SetVector ("BottomScale",             StartScaleGenerator.BottomScalar);
-        Simulator.SetVector ("TopScale",                StartScaleGenerator.TopScalar);
+        Simulator.SetInt    ("StartScaleScalarType",    (int)StartScaleGenerator.Type           );
+        Simulator.SetInt    ("UniformStartScale",       StartScaleGenerator.Uniform ? 1 : 0     );
+        Simulator.SetVector ("ExactStartScale",         StartScaleGenerator.ExactScalar         );
+        Simulator.SetVector ("BottomStartScale",        StartScaleGenerator.BottomScalar        );
+        Simulator.SetVector ("TopStartScale",           StartScaleGenerator.TopScalar           );
+        Simulator.SetInt    ("UseEndScale",             UseEndScale ? 1 : 0                     );               
+
+        // TODO: FIX!
+        BillboardRenderParams.matProps.SetInteger("UseEndScale", UseEndScale ? 1 : 0            );
+        MeshRenderParams.matProps.SetInteger("UseEndScale", UseEndScale ? 1 : 0                 );
+
+        Simulator.SetInt    ("EndScaleScalarType",      (int)EndScaleGenerator.Type             );
+        Simulator.SetInt    ("UniformEndScale",         EndScaleGenerator.Uniform ? 1 : 0       );
+        Simulator.SetVector ("ExactEndScale",           EndScaleGenerator.ExactScalar           );
+        Simulator.SetVector ("BottomEndScale",          EndScaleGenerator.BottomScalar          );
+        Simulator.SetVector ("TopEndScale",             EndScaleGenerator.TopScalar             );
 
         // Set rotation-related values
-        Simulator.SetInt    ("RotationScalarType",      ((int)StartRotationGenerator.Type));
-        Simulator.SetVector ("ExactRotation",           StartRotationGenerator.ExactScalar);
-        Simulator.SetVector ("BottomRotation",          StartRotationGenerator.BottomScalar);
-        Simulator.SetVector ("TopRotation",             StartRotationGenerator.TopScalar);
+        Simulator.SetInt    ("RotationScalarType",      (int)StartRotationGenerator.Type        );
+        Simulator.SetVector ("ExactRotation",           StartRotationGenerator.ExactScalar      );
+        Simulator.SetVector ("BottomRotation",          StartRotationGenerator.BottomScalar     );
+        Simulator.SetVector ("TopRotation",             StartRotationGenerator.TopScalar        );
 
         // Set colour-related values
-        Simulator.SetInt    ("ColourScalarType",        ((int)StartColourGenerator.Type));
-        Simulator.SetVector ("ExactColour",             StartColourGenerator.ExactScalar);
-        Simulator.SetVector ("BottomColour",            StartColourGenerator.BottomScalar);
-        Simulator.SetVector ("TopColour",               StartColourGenerator.TopScalar);
+        Simulator.SetInt    ("ColourScalarType",        (int)StartColourGenerator.Type          );
+        Simulator.SetVector ("ExactColour",             StartColourGenerator.ExactScalar        );
+        Simulator.SetVector ("BottomColour",            StartColourGenerator.BottomScalar       );
+        Simulator.SetVector ("TopColour",               StartColourGenerator.TopScalar          );
     }
 
     void SynchronizeCounters()
@@ -451,7 +468,8 @@ public class CPS : MonoBehaviour
             MaximumParticleCount,
             (
                 + 3 /* Position          */
-                + 3 /* Scale             */
+                + 3 /* StartScale        */
+                + 3 /* EndScale          */
                 + 3 /* Rotation          */
                 + 3 /* Velocity          */
                 + 3 /* OuterVelocity     */
@@ -926,12 +944,19 @@ public class CPSEditor : Editor
     SerializedProperty _BillboardTexture;
     SerializedProperty _ParticleMesh;
 
-    // Start properties
+    // Properties
     SerializedProperty  _StartVelocityGenerator;
+
     SerializedProperty  _StartScaleGenerator;
+    SerializedProperty  _UseEndScale;
+    SerializedProperty  _EndScaleGenerator;
+
     SerializedProperty  _StartRotationGenerator;
+
     SerializedProperty  _StartLifetimeGenerator;
+
     SerializedProperty  _StartPositionGenerator;
+
     SerializedProperty  _StartColourGenerator;
 
     // Simulation properties
@@ -958,10 +983,17 @@ public class CPSEditor : Editor
         _ParticleMesh               = _CPS.FindProperty("ParticleMesh");
 
         _StartVelocityGenerator     = _CPS.FindProperty("StartVelocityGenerator");
+
         _StartScaleGenerator        = _CPS.FindProperty("StartScaleGenerator");
+        _UseEndScale                = _CPS.FindProperty("UseEndScale");
+        _EndScaleGenerator          = _CPS.FindProperty("EndScaleGenerator");
+
         _StartRotationGenerator     = _CPS.FindProperty("StartRotationGenerator");
+
         _StartLifetimeGenerator     = _CPS.FindProperty("StartLifetimeGenerator");
+
         _StartPositionGenerator     = _CPS.FindProperty("StartPositionGenerator");
+
         _StartColourGenerator        = _CPS.FindProperty("StartColourGenerator");
 
         _MaximumParticleCount       = _CPS.FindProperty("MaximumParticleCount");
@@ -1005,17 +1037,32 @@ public class CPSEditor : Editor
 
     void PropertiesSubMenu()
     {
-        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime",       new Vector2(CPS.MinimalParticleLifetime, float.MaxValue) );
-        HorizontalSeparator();
-        ManipulateFunctionGenerator(_StartPositionGenerator,  "Start Position"                                                           );
-        HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale",    new Vector2(float.Epsilon, float.MaxValue)               );
-        HorizontalSeparator();
-        Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation"));
-        HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity", null                                                     );
-        HorizontalSeparator();
-        ManipulateScalarGenerator3D(_StartColourGenerator,    "Start Colour",   new Vector2(0.0f, 1.0f)                                  );
+        ManipulateScalarGenerator1D(_StartLifetimeGenerator,  "Lifetime",       new Vector2(CPS.MinimalParticleLifetime, float.MaxValue)             );
+
+    HorizontalSeparator();
+
+        ManipulateFunctionGenerator(_StartPositionGenerator,  "Start Position"                                                                       );
+
+    HorizontalSeparator();
+
+        ManipulateScalarGenerator3D(_StartScaleGenerator,     "Start Scale",    new Vector2(float.Epsilon, float.MaxValue)                           );
+        EditorGUILayout.PropertyField(_UseEndScale, true);
+        if(_UseEndScale.boolValue)
+        {
+            ManipulateScalarGenerator3D(_EndScaleGenerator,   "End Scale",      new Vector2(float.Epsilon, float.MaxValue)                           );
+        }
+
+    HorizontalSeparator();
+
+        Disabled(Target.RenderType == CPS.ParticleRenderType.Billboard, () => ManipulateScalarGenerator3D(_StartRotationGenerator, "Start Rotation") );
+
+    HorizontalSeparator();
+
+        ManipulateScalarGenerator3D(_StartVelocityGenerator,  "Start Velocity", null                                                                 );
+
+    HorizontalSeparator();
+
+        ManipulateScalarGenerator3D(_StartColourGenerator,    "Start Colour",   new Vector2(0.0f, 1.0f)                                              );
     }
 
     void SimulationSubMenu()

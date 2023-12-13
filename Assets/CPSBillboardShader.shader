@@ -49,7 +49,8 @@ Shader "Unlit/CPSBillboardShader"
             struct SimulationState
             {
                 float3  Position;
-                float3  Scale;
+                float3  StartScale;
+                float3  EndScale;
                 float3  Rotation;
                 float3  Velocity;
                 float3  ExternalVelocity;
@@ -66,7 +67,7 @@ Shader "Unlit/CPSBillboardShader"
                 int Seed;
                 int SimulationSpace;
                 int RenderType;
-
+    
                 // Kernel Stuff
                 int DISPATCH_NUM;
                 int MAX_PARTICLE_COUNT;
@@ -77,11 +78,8 @@ Shader "Unlit/CPSBillboardShader"
 
                 // Environment Stuff
                 float3 EmitterPositionWS;
-
                 float GravityForce;
     
-                // TODO: Expand existing ones
- 
                 // Lifetime
                 int LifetimeScalarType;
                 float ExactLifetime;
@@ -100,17 +98,30 @@ Shader "Unlit/CPSBillboardShader"
                 float3 TopVelocity;
     
                 // Scale
-                int ScaleScalarType;
-                int UniformScale;
-                float3 ExactScale;
-                float3 BottomScale;
-                float3 TopScale;
+                int StartScaleScalarType;
+                int UniformStartScale;
+                float3 ExactStartScale;
+                float3 BottomStartScale;
+                float3 TopStartScale;
+                int UseEndScale;
+                int EndScaleScalarType;
+                int UniformEndScale;
+                float3 ExactEndScale;
+                float3 BottomEndScale;
+                float3 TopEndScale;
+    
     
                 // Rotation
                 int RotationScalarType;
                 float3 ExactRotation;
                 float3 BottomRotation;
                 float3 TopRotation;
+    
+                // Colour
+                int ColourScalarType;
+                float3 ExactColour;
+                float3 BottomColour;
+                float3 TopColour;
     
                 // TODO: Expand new ones
             };
@@ -200,15 +211,19 @@ Shader "Unlit/CPSBillboardShader"
             void geom(point GEOM_IN input[1], inout TriangleStream<FRAG_IN> output)
             {
                 FRAG_IN OUT = (FRAG_IN)0;
-
                 uint id = input[0].ID;
-                if(SimulationStateBuffer[id].Current_Max_Life.x <= 0) { return; }
 
+                float2 Current_Max_Life = SimulationStateBuffer[id].Current_Max_Life; 
+
+                if(Current_Max_Life.x <= 0) { return; }
+
+                float p         = (Current_Max_Life.y - Current_Max_Life.x) / Current_Max_Life.y;
                 OUT.Colour      = half4(SimulationStateBuffer[id].Colour, 1);
                 int space       = SimulationStateBuffer[id].SimSpace_RendType[0];
                 float3 pos      = SimulationStateBuffer[id].Position;
                 float3 rot      = SimulationStateBuffer[id].Rotation;
-                float3 scale    = SimulationStateBuffer[id].Scale;
+                float3 scale    = UseEndScale ? lerp(SimulationStateBuffer[id].StartScale, SimulationStateBuffer[id].EndScale, p) : SimulationStateBuffer[id].StartScale;
+                // float3 scale    = UseEndScale == 1 ? SimulationStateBuffer[id].EndScale : SimulationStateBuffer[id].StartScale;
                 
                 // NOTE: Should particles stretch with the size of Emitter when they are in LOCAL_SPACE? Or should they just
                 // transform their positions? Stretching doesnt seem right (eg. Particles at the extreme positions will have

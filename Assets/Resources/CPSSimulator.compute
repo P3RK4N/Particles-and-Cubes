@@ -124,8 +124,7 @@ uniform int     ForceFieldsCount;
 uniform int     ForceFieldTypes                  [CPS_MAX_FORCEFIELD_COUNT];
 uniform int     ForceFieldGeneratorTypes         [CPS_MAX_FORCEFIELD_COUNT];
 uniform float   ForceFieldIntensities            [CPS_MAX_FORCEFIELD_COUNT];
-uniform float3  ForceFieldGeneratorCenterOffsets [CPS_MAX_FORCEFIELD_COUNT];
-uniform float4  ForceFieldCoefficients           [CPS_MAX_FORCEFIELD_COUNT];
+uniform float4  ForceFieldGeneratorCenterOffsets [CPS_MAX_FORCEFIELD_COUNT];
 
 RWStructuredBuffer<int>  CurrentParticleCountBuffer;
 RWStructuredBuffer<int>  EmissionAmountCounterBuffer;
@@ -536,18 +535,16 @@ void UpdateExternalVelocity(uint ID)
     [unroll]
     for (int i = 0; i < CPS_MAX_FORCEFIELD_COUNT; i++)
     {
-        if (i >= ForceFieldsCount || UseForceFields == 0)
-            break;
+        if (i >= ForceFieldsCount || UseForceFields == 0) break;
 
-        float3 dir = ForceFieldGeneratorCenterOffsets[i] - SimulationStateBuffer[ID].Position;
+        float3 dir = ForceFieldGeneratorCenterOffsets[i].xyz - SimulationStateBuffer[ID].Position;
         float distLin = length(dir);
         
         SimulationStateBuffer[ID].ExternalVelocity +=
-            + ForceFieldCoefficients[i][ForceFieldTypes[i]]
-            * pow(distLin, FalloffPowers[ForceFieldTypes[i]])
+            + DeltaTime
             * ForceFieldIntensities[i]
-            * DeltaTime
-            * normalize(dir);
+            * normalize(dir)
+            / (1 + pow(distLin, FalloffPowers[ForceFieldTypes[i]]));
     }
 }
 

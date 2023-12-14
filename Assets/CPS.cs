@@ -7,6 +7,8 @@ using static UnityEngine.GraphicsBuffer;
 using UnityEngine.Assertions;
 using System.Linq;
 using static UnityEngine.Rendering.DebugUI;
+using Unity.Mathematics;
+
 
 
 
@@ -114,7 +116,6 @@ public class CPS : MonoBehaviour
     {
         [SerializeField] public FalloffType Type;
         [SerializeField] public float Intensity;
-        [SerializeField] public Vector4 Coefficients;
         [SerializeField] public FunctionGenerator Generator;
     }
 
@@ -339,6 +340,8 @@ public class CPS : MonoBehaviour
     
     void Update()
     {
+        if(tf.hasChanged) OnValidate();
+
         UpdateLocalShaderVariables();
         SynchronizeCounters();
 
@@ -454,37 +457,49 @@ public class CPS : MonoBehaviour
         Simulator.SetVector ("TopEndColour",                EndColourGenerator.TopScalar            );
         
         // SHADER VALUES
-        BillboardRenderParams.matProps.SetInteger ("UseEndScale",  UseEndScale ? 1 : 0          );
-        MeshRenderParams.matProps.SetInteger      ("UseEndScale",  UseEndScale ? 1 : 0          );
-        BillboardRenderParams.matProps.SetInteger ("UseEndColour", UseEndColour ? 1 : 0         );
-        MeshRenderParams.matProps.SetInteger      ("UseEndColour", UseEndColour ? 1 : 0         );
+        BillboardRenderParams.matProps.SetInteger ("UseEndScale",  UseEndScale ? 1 : 0              );
+        MeshRenderParams.matProps.SetInteger      ("UseEndScale",  UseEndScale ? 1 : 0              );
+        BillboardRenderParams.matProps.SetInteger ("UseEndColour", UseEndColour ? 1 : 0             );
+        MeshRenderParams.matProps.SetInteger      ("UseEndColour", UseEndColour ? 1 : 0             );
 
         // FORCEFIELD VALUES
         if(ForceFields.Count > FORCEFIELD_HARD_LIMIT)
         {
-            Debug.LogWarning($"ForceField count cannot exceed {FORCEFIELD_HARD_LIMIT}!");
+            Debug.LogWarning($"ForceField count cannot exceed {FORCEFIELD_HARD_LIMIT}!"             );
             ForceFields.RemoveRange(FORCEFIELD_HARD_LIMIT, ForceFields.Count - FORCEFIELD_HARD_LIMIT);
         }
 
-        Simulator.SetInt            ("UseForceFields",                      UseForceFields ? 1 : 0);
-        Simulator.SetInt            ("ForceFieldsCount",                    ForceFields.Count);
-        Simulator.SetInts           ("ForceFieldTypes",                     ForceFields.ConvertAll(descriptor => (int)descriptor.Type).ToArray());
-        Simulator.SetInts           ("ForceFieldGeneratorTypes",            ForceFields.ConvertAll(descriptor => (int)descriptor.Generator.Type).ToArray());
-        Simulator.SetFloats         ("ForceFieldIntensities",               ForceFields.ConvertAll(descriptor => descriptor.Intensity).ToArray());
-        Simulator.SetVectorArray    ("ForceFieldGeneratorCenterOffsets",    ForceFields.ConvertAll
-        (
-            descriptor =>
-            {
-                var pos = descriptor.Generator.CenterOffset;
-                return (Vector4)(SimulationSpace == SimulationSpaceType.Global
-                            ? tf.position + pos
-                            : tf.localToWorldMatrix * new Vector4(pos.x, pos.y, pos.z, 1));
-            }
-        ).ToArray());
-        Simulator.SetVectorArray    ("ForceFieldCoefficients",              ForceFields.ConvertAll
-        (
-            descriptor => new Vector4(descriptor.Coefficients.x, descriptor.Coefficients.y, descriptor.Coefficients.z, 0)
-        ).ToArray());
+        Simulator.SetInt            ("UseForceFields",                      UseForceFields ? 1 : 0  );
+        Simulator.SetInt            ("ForceFieldsCount",                    ForceFields.Count       );
+
+        // NOTE: Since everything has padding of 16 Bytes, for each int and float we need to send 4 ints/floats
+        Simulator.SetInts           ("ForceFieldTypes",                     ForceFields
+            .ConvertAll(descriptor => (int)descriptor.Type)
+            .SelectMany(val => Enumerable.Repeat(val, 4))
+            .ToArray());
+        
+        Simulator.SetInts           ("ForceFieldGeneratorTypes",            ForceFields
+            .ConvertAll(descriptor => (int)descriptor.Generator.Type)
+            .SelectMany(val => Enumerable.Repeat(val, 4))
+            .ToArray());
+
+        Simulator.SetFloats         ("ForceFieldIntensities",               ForceFields
+            .ConvertAll(descriptor => descriptor.Intensity)
+            .SelectMany(val => Enumerable.Repeat(val, 4))
+            .ToArray());
+
+        Simulator.SetVectorArray    ("ForceFieldGeneratorCenterOffsets",    ForceFields
+            .ConvertAll
+            (
+                descriptor =>
+                {
+                    var pos = descriptor.Generator.CenterOffset;
+                    return (Vector4)(SimulationSpace == SimulationSpaceType.Global
+                                ? tf.position + pos
+                                : /*tf.localToWorldMatrix * */new Vector4(pos.x, pos.y, pos.z, 1));
+                }
+            )
+            .ToArray());
     }
 
     void SynchronizeCounters()
@@ -671,7 +686,7 @@ public class CPS : MonoBehaviour
             {
                 case FunctionGeneratorType.Point:
                 {
-                    DebugExtension.DrawPoint(pos, col, Mathf.Abs(ffield.Intensity));
+                    DebugExtension.DrawPoint(pos, col, Mathf.Abs(ffield.Intensity) / 10.0f);
                     break;
                 }
                 default:

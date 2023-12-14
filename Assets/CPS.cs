@@ -260,6 +260,21 @@ public class CPS : MonoBehaviour
     /// </summary>
     [SerializeField] public bool                        UseForceFields;
 
+    /// <summary>
+    /// Environmental VectorField frequency
+    /// </summary>
+    [SerializeField] public float                       VectorFieldFrequency;
+
+    /// <summary>
+    /// Environmental VectorField intensity
+    /// </summary>
+    [SerializeField] public float                       VectorFieldIntensity;
+
+    /// <summary>
+    /// Turns VectorFields ON or OFF
+    /// </summary>
+    [SerializeField] public bool                        UseVectorField;
+
 #endregion
 
 
@@ -500,6 +515,11 @@ public class CPS : MonoBehaviour
                 }
             )
             .ToArray());
+
+        // VECTOR FIELD VALUES
+        Simulator.SetInt("UseVectorField", UseVectorField ? 1 : 0);
+        Simulator.SetFloat("VectorFieldFrequency", VectorFieldFrequency);
+        Simulator.SetFloat("VectorFieldIntensity", VectorFieldIntensity);
     }
 
     void SynchronizeCounters()
@@ -1091,6 +1111,9 @@ public class CPSEditor : Editor
     SerializedProperty _ForceFields;
     SerializedProperty _UseForceFields;
 
+    SerializedProperty _VectorFieldFrequency;
+    SerializedProperty _VectorFieldIntensity;
+    SerializedProperty _UseVectorField;
 
     void OnEnable()
     {
@@ -1134,6 +1157,10 @@ public class CPSEditor : Editor
 
         _ForceFields                = _CPS.FindProperty("ForceFields");
         _UseForceFields             = _CPS.FindProperty("UseForceFields");
+
+        _VectorFieldFrequency       = _CPS.FindProperty("VectorFieldFrequency");
+        _VectorFieldIntensity       = _CPS.FindProperty("VectorFieldIntensity");
+        _UseVectorField             = _CPS.FindProperty("UseVectorField");
     }
 
     CPS Target { get => target as CPS; }
@@ -1236,6 +1263,12 @@ public class CPSEditor : Editor
 
         EditorGUILayout.PropertyField(_UseForceFields);
         Disabled(!_UseForceFields.boolValue, () => EditorGUILayout.PropertyField(_ForceFields, true));
+
+    HorizontalSeparator();
+
+        EditorGUILayout.PropertyField(_UseVectorField);
+        Disabled(!_UseVectorField.boolValue, () => EditorGUILayout.PropertyField(_VectorFieldFrequency));
+        Disabled(!_UseVectorField.boolValue, () => EditorGUILayout.PropertyField(_VectorFieldIntensity));
     }
 
     public override void OnInspectorGUI()

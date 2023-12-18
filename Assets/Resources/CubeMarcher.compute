@@ -1,0 +1,94 @@
+#pragma kernel March
+
+#include "Assets/Script-MarchingCubes/MarchingTable.hlsl"
+
+#define CM_GROUP_SIZE 8
+
+// Layout:
+// 1 float for determining valid point, 3 floats for point
+RWStructuredBuffer<float4> MeshBuffer;
+
+uniform float3  StartPosition;
+uniform float   MarchStep;
+uniform float   ValueBorder;
+uniform int     MeshResolutionPerDim;
+
+static const int VERTICES_PER_THREAD = 3 /* POINTS */ * 15 /* MAX_TRIANGLES */;
+float Noise(float3 pos)
+{
+    return 0.0;
+}
+
+[numthreads(CM_GROUP_SIZE,CM_GROUP_SIZE,CM_GROUP_SIZE)]
+void March(uint3 id : SV_DispatchThreadID)
+{
+    /*
+        #################################################
+        ############# Get world points ##################
+        #################################################
+    */
+    
+    if(id.x >= (uint)MeshResolutionPerDim || id.y >= (uint)MeshResolutionPerDim || id.z >= (uint)MeshResolutionPerDim) return;
+    
+    float3 pos = StartPosition + id * MarchStep;
+    float3 worldPositions[8] =
+    {
+        pos + CornerOffsets[0] * MarchStep * 0.5,
+        pos + CornerOffsets[1] * MarchStep * 0.5,
+        pos + CornerOffsets[2] * MarchStep * 0.5,
+        pos + CornerOffsets[3] * MarchStep * 0.5,
+        pos + CornerOffsets[4] * MarchStep * 0.5,
+        pos + CornerOffsets[5] * MarchStep * 0.5,
+        pos + CornerOffsets[6] * MarchStep * 0.5,
+        pos + CornerOffsets[7] * MarchStep * 0.5
+    };
+    
+    /*
+        #################################################
+        ############# Find cube index ###################
+        #################################################
+    */
+    
+    int cubeIndex = 0;
+    if(Noise(worldPositions[0]) < ValueBorder) cubeIndex |= 1;
+    if(Noise(worldPositions[1]) < ValueBorder) cubeIndex |= 2;
+    if(Noise(worldPositions[2]) < ValueBorder) cubeIndex |= 4;
+    if(Noise(worldPositions[3]) < ValueBorder) cubeIndex |= 8;
+    if(Noise(worldPositions[4]) < ValueBorder) cubeIndex |= 16;
+    if(Noise(worldPositions[5]) < ValueBorder) cubeIndex |= 32;
+    if(Noise(worldPositions[6]) < ValueBorder) cubeIndex |= 64;
+    if(Noise(worldPositions[7]) < ValueBorder) cubeIndex |= 128;
+
+    /*
+        #################################################
+        ############# Append triangles ##################
+        #################################################
+    */
+    
+    // Flatten 3D Index to 1D
+    // I = x + yDx + zDxDy
+    // id *= VERTICES_PER_THREAD; // Scale from Current March Cube to Current Vertex Offset
+    int index1D = id.x + MeshResolutionPerDim * id.y + MeshResolutionPerDim * MeshResolutionPerDim * id.z;
+    index1D *= VERTICES_PER_THREAD; // Scale from Current March Cube to Current Vertex Offset
+    int i = 0;
+    
+    // Fill valid vertices into mesh buffer
+    [unroll]
+    for(; i < 15; i++)
+    {
+        if(TriangleTable[cubeIndex][i] == -1) break;
+
+        MeshBuffer[index1D + i * 3 + 0] = float4(worldPositions[TriangleTable[cubeIndex][i + 0]], 1);
+        MeshBuffer[index1D + i * 3 + 1] = float4(worldPositions[TriangleTable[cubeIndex][i + 1]], 1);
+        MeshBuffer[index1D + i * 3 + 2] = float4(worldPositions[TriangleTable[cubeIndex][i + 2]], 1);
+    }
+    
+    // Fill the rest of chunk with invalid vertices
+    [unroll]
+    for (; i <= 15; i++)
+    {
+        MeshBuffer[index1D + i * 3 + 0] = float4(0, 0, 0, 0);
+        MeshBuffer[index1D + i * 3 + 1] = float4(0, 0, 0, 0);
+        MeshBuffer[index1D + i * 3 + 2] = float4(0, 0, 0, 0);
+    }
+}

@@ -277,6 +277,7 @@ Shader "Unlit/CPSMeshShader"
                 float3 lightDir = UnityWorldSpaceLightDir(IN.PositionWS);
                 float val = dot(lightDir, IN.Normal) * 0.5 + 0.5;
                 return half4(val,val,val,1) * IN.Colour;
+                // return IN.Colour;
             }
             
             ENDCG

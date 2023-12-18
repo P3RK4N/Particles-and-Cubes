@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_SkyboxMaterial: {fileID: 2100000, guid: c88253ceb8a55fe42ae86bf2a09473df, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -123,6 +123,132 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &261769820
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 261769822}
+  - component: {fileID: 261769821}
+  m_Layer: 0
+  m_Name: CPS - StressTest
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &261769821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 261769820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3188efeb0de137442aa27bfe31ef173b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  SimulatorTemplate: {fileID: 7200000, guid: 50371e5b651fc8843ba6aed691afe716, type: 3}
+  BillboardMaterialTemplate: {fileID: 2100000, guid: f01dd0632349c0e479da115ce2925653,
+    type: 2}
+  MeshMaterialTemplate: {fileID: 2100000, guid: c88498df522ca8a48ace28dcfa3e90c9,
+    type: 2}
+  Seed: 0
+  SimulationSpace: 1
+  RenderType: 0
+  DrawGUI: 1
+  BillboardTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}
+  ParticleMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  StartPositionGenerator:
+    Type: 1
+    CenterOffset: {x: 0, y: 0, z: 0}
+    Radius: 3.51
+  StartLifetimeGenerator:
+    Type: 0
+    ExactScalar: 10
+    Uniform: 0
+    BottomScalar: 0.54
+    TopScalar: 6.21
+  StartVelocityGenerator:
+    Type: 1
+    ExactScalar: {x: 10.15, y: 10.15, z: 10.15}
+    Uniform: 0
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 50, y: 0, z: 0}
+  StartScaleGenerator:
+    Type: 0
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
+    BottomScalar: {x: 0.05, y: 0.05, z: 0.05}
+    TopScalar: {x: 1.42, y: 1.42, z: 1.42}
+  UseEndScale: 0
+  EndScaleGenerator:
+    Type: 0
+    ExactScalar: {x: 1.34, y: 1.34, z: 1.34}
+    Uniform: 1
+    BottomScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
+    TopScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
+  StartRotationGenerator:
+    Type: 0
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 0
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 0, y: 0, z: 0}
+  RotationOverTimeGenerator:
+    Type: 0
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 0
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 0, y: 0, z: 0}
+  StartColourGenerator:
+    Type: 1
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 1, y: 1, z: 1}
+  UseEndColour: 0
+  EndColourGenerator:
+    Type: 0
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 0, y: 0, z: 0}
+  MaximumParticleCount: 1000000
+  CurrentParticleCount: 993680
+  EmissionRate: 100000
+  EmissionAmount: 0.5683594
+  Gravity: 0
+  Drag: 1
+  ForceFields:
+  - Type: 2
+    Intensity: 1418.89
+    Generator:
+      Type: 0
+      CenterOffset: {x: 16, y: 23.3, z: 0}
+      Radius: 0
+  UseForceFields: 1
+  VectorFieldFrequency: 0.16
+  VectorFieldIntensity: 0.01
+  UseVectorField: 0
+--- !u!4 &261769822
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 261769820}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 50, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &325595975
 GameObject:
   m_ObjectHideFlags: 0
@@ -139,7 +265,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &325595977
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -169,7 +295,7 @@ MonoBehaviour:
     Radius: 3.51
   StartLifetimeGenerator:
     Type: 0
-    ExactScalar: 2.38
+    ExactScalar: 8
     Uniform: 0
     BottomScalar: 0.54
     TopScalar: 6.21
@@ -217,24 +343,24 @@ MonoBehaviour:
     Uniform: 1
     BottomScalar: {x: 0, y: 0, z: 0}
     TopScalar: {x: 0, y: 0, z: 0}
-  MaximumParticleCount: 50000
-  CurrentParticleCount: 44456
-  EmissionRate: 26107
-  EmissionAmount: 0.9454346
+  MaximumParticleCount: 1000000
+  CurrentParticleCount: 500000
+  EmissionRate: 100000
+  EmissionAmount: 0.44317627
   Gravity: 0
   Drag: 0.08
   ForceFields:
   - Type: 2
-    Intensity: 57.54
+    Intensity: 174.23
     Generator:
       Type: 0
-      CenterOffset: {x: -2.16, y: 4.76, z: 0}
+      CenterOffset: {x: -1, y: 14.28, z: 0}
       Radius: 0
   - Type: 2
-    Intensity: -65.55
+    Intensity: -105.18
     Generator:
       Type: 0
-      CenterOffset: {x: -0.4, y: 9.16, z: 0}
+      CenterOffset: {x: 3.64, y: 7.03, z: 0}
       Radius: 0
   UseForceFields: 1
   VectorFieldFrequency: 0
@@ -249,7 +375,7 @@ Transform:
   m_GameObject: {fileID: 325595975}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -37.12, y: 10.01, z: -7.74}
+  m_LocalPosition: {x: 20, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -553,32 +679,32 @@ MonoBehaviour:
   StartPositionGenerator:
     Type: 1
     CenterOffset: {x: 0, y: 0, z: 0}
-    Radius: 2.9
+    Radius: 2.79
   StartLifetimeGenerator:
     Type: 0
-    ExactScalar: 2.2
+    ExactScalar: 2.25
     Uniform: 0
     BottomScalar: 0.1
     TopScalar: 5.01
   StartVelocityGenerator:
-    Type: 0
+    Type: 1
     ExactScalar: {x: 2.08, y: 2.08, z: 2.08}
     Uniform: 1
-    BottomScalar: {x: -1.17, y: -0.94, z: -0.48}
-    TopScalar: {x: 1, y: 1.3, z: 1}
+    BottomScalar: {x: -2, y: -2, z: -2}
+    TopScalar: {x: 2, y: 2, z: 2}
   StartScaleGenerator:
     Type: 1
     ExactScalar: {x: 1, y: 1, z: 1}
     Uniform: 1
-    BottomScalar: {x: 0.28, y: 0.28, z: 0.28}
-    TopScalar: {x: 0.71, y: 0.71, z: 0.71}
+    BottomScalar: {x: 0.49, y: 0.49, z: 0.49}
+    TopScalar: {x: 0.9, y: 0.9, z: 0.9}
   UseEndScale: 1
   EndScaleGenerator:
-    Type: 0
+    Type: 1
     ExactScalar: {x: 0.48, y: 0.48, z: 0.48}
     Uniform: 1
-    BottomScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
-    TopScalar: {x: 1e-45, y: 1e-45, z: 1e-45}
+    BottomScalar: {x: 0.1, y: 0.1, z: 0.1}
+    TopScalar: {x: 0.49, y: 0.49, z: 0.49}
   StartRotationGenerator:
     Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
@@ -589,8 +715,8 @@ MonoBehaviour:
     Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
     Uniform: 1
-    BottomScalar: {x: -30, y: -30, z: -30}
-    TopScalar: {x: 30, y: 30, z: 30}
+    BottomScalar: {x: -60, y: -60, z: -60}
+    TopScalar: {x: 60, y: 60, z: 60}
   StartColourGenerator:
     Type: 1
     ExactScalar: {x: 0, y: 0, z: 0}
@@ -603,12 +729,12 @@ MonoBehaviour:
     ExactScalar: {x: 0.18, y: 0.18, z: 0.18}
     Uniform: 0
     BottomScalar: {x: 0, y: 0, z: 0}
-    TopScalar: {x: 1, y: 1, z: 0}
-  MaximumParticleCount: 1000
-  CurrentParticleCount: 840
-  EmissionRate: 382.82
-  EmissionAmount: 0.40343094
-  Gravity: 1.84
+    TopScalar: {x: 0, y: 0, z: 0}
+  MaximumParticleCount: 300
+  CurrentParticleCount: 181
+  EmissionRate: 80.25
+  EmissionAmount: 0.5357462
+  Gravity: -9.23
   Drag: 0.06
   ForceFields: []
   UseForceFields: 0
@@ -624,12 +750,69 @@ Transform:
   m_GameObject: {fileID: 628951754}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -27.5, y: 0, z: -7.7}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &714430784
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 100000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_Name
+      value: FX_Fire
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -11.096352
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.00000047683716
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4.158885
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 756d99540142b5e4a8d174e18a6310d9, type: 3}
 --- !u!1 &1462760039
 GameObject:
   m_ObjectHideFlags: 0
@@ -646,7 +829,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1462760040
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -681,9 +864,9 @@ MonoBehaviour:
     BottomScalar: 0.54
     TopScalar: 6.21
   StartVelocityGenerator:
-    Type: 1
-    ExactScalar: {x: 0, y: 0, z: 0}
-    Uniform: 0
+    Type: 0
+    ExactScalar: {x: 10.15, y: 10.15, z: 10.15}
+    Uniform: 1
     BottomScalar: {x: -0.3, y: 1, z: -0.3}
     TopScalar: {x: 0.3, y: 4, z: 0.3}
   StartScaleGenerator:
@@ -729,11 +912,11 @@ MonoBehaviour:
   EmissionRate: 26107
   EmissionAmount: 0.9454346
   Gravity: 0
-  Drag: 0.08
+  Drag: 0.21
   ForceFields: []
   UseForceFields: 0
-  VectorFieldFrequency: 1
-  VectorFieldIntensity: 1.72
+  VectorFieldFrequency: 0.16
+  VectorFieldIntensity: 0.01
   UseVectorField: 1
 --- !u!4 &1462760041
 Transform:
@@ -744,7 +927,127 @@ Transform:
   m_GameObject: {fileID: 1462760039}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -37.12, y: 10.01, z: -7.74}
+  m_LocalPosition: {x: 30, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1803154523
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1803154525}
+  - component: {fileID: 1803154524}
+  m_Layer: 0
+  m_Name: CPS - Fire
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1803154524
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1803154523}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3188efeb0de137442aa27bfe31ef173b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  SimulatorTemplate: {fileID: 7200000, guid: 50371e5b651fc8843ba6aed691afe716, type: 3}
+  BillboardMaterialTemplate: {fileID: 2100000, guid: f01dd0632349c0e479da115ce2925653,
+    type: 2}
+  MeshMaterialTemplate: {fileID: 2100000, guid: c88498df522ca8a48ace28dcfa3e90c9,
+    type: 2}
+  Seed: 0
+  SimulationSpace: 0
+  RenderType: 2
+  DrawGUI: 1
+  BillboardTexture: {fileID: 2800000, guid: 8fe359586b4abbe46b1454362bea6fc0, type: 3}
+  ParticleMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  StartPositionGenerator:
+    Type: 1
+    CenterOffset: {x: 0, y: 0, z: 0}
+    Radius: 0.48
+  StartLifetimeGenerator:
+    Type: 1
+    ExactScalar: 3
+    Uniform: 0
+    BottomScalar: 1.15
+    TopScalar: 3.23
+  StartVelocityGenerator:
+    Type: 1
+    ExactScalar: {x: 2.08, y: 2.08, z: 2.08}
+    Uniform: 0
+    BottomScalar: {x: -0.1, y: 0, z: -0.1}
+    TopScalar: {x: 0.1, y: 0.88, z: 0.1}
+  StartScaleGenerator:
+    Type: 1
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
+    BottomScalar: {x: 0.42, y: 0.42, z: 0.42}
+    TopScalar: {x: 0.81, y: 0.81, z: 0.81}
+  UseEndScale: 1
+  EndScaleGenerator:
+    Type: 1
+    ExactScalar: {x: 0.48, y: 0.48, z: 0.48}
+    Uniform: 1
+    BottomScalar: {x: 0.06, y: 0.06, z: 0.06}
+    TopScalar: {x: 0.26, y: 0.26, z: 0.26}
+  StartRotationGenerator:
+    Type: 1
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 1
+    BottomScalar: {x: -180, y: -180, z: -180}
+    TopScalar: {x: 180, y: 180, z: 180}
+  RotationOverTimeGenerator:
+    Type: 1
+    ExactScalar: {x: 0, y: 0, z: 0}
+    Uniform: 1
+    BottomScalar: {x: -30, y: -30, z: -30}
+    TopScalar: {x: 30, y: 30, z: 30}
+  StartColourGenerator:
+    Type: 0
+    ExactScalar: {x: 1, y: 1, z: 1}
+    Uniform: 1
+    BottomScalar: {x: 0, y: 0, z: 0}
+    TopScalar: {x: 1, y: 1, z: 1}
+  UseEndColour: 1
+  EndColourGenerator:
+    Type: 0
+    ExactScalar: {x: 1, y: 0.64705884, z: 0}
+    Uniform: 0
+    BottomScalar: {x: 1, y: 0.59, z: 0}
+    TopScalar: {x: 1, y: 0.59, z: 0}
+  MaximumParticleCount: 1000
+  CurrentParticleCount: 97
+  EmissionRate: 47.1
+  EmissionAmount: 0.65775204
+  Gravity: 0.66
+  Drag: 0.5
+  ForceFields: []
+  UseForceFields: 0
+  VectorFieldFrequency: 0
+  VectorFieldIntensity: 0
+  UseVectorField: 0
+--- !u!4 &1803154525
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1803154523}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 10, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -757,5 +1060,8 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 628951756}
+  - {fileID: 1803154525}
   - {fileID: 325595978}
   - {fileID: 1462760041}
+  - {fileID: 261769822}
+  - {fileID: 714430784}

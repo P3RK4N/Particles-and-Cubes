@@ -277,8 +277,10 @@ public class CPS : MonoBehaviour
 
 #endregion
 
+    public static readonly int      CPS_GROUP_SIZE          = 32;
+    public static readonly int      CPS_NUM_GROUPS          = 64;
 
-    public static readonly int      HARD_LIMIT              = 32 * 32 * 32 * 32 - 1;
+    public static readonly int      HARD_LIMIT              = CPS_GROUP_SIZE * CPS_GROUP_SIZE * CPS_NUM_GROUPS * CPS_NUM_GROUPS - 1;
     public static readonly int      FORCEFIELD_HARD_LIMIT   = 10;
     public static readonly int      GlobalStateSizeInFloat  = 96;
     public static readonly float    MinimalParticleLifetime = 0.1f;
@@ -629,7 +631,7 @@ public class CPS : MonoBehaviour
     void InitializeRenderContext()
     {
         BillboardRenderParams                            = new RenderParams(Instantiate(BillboardMaterialTemplate));
-        BillboardRenderParams.worldBounds                = new Bounds(Vector3.zero, 10000*Vector3.one);
+        BillboardRenderParams.worldBounds                = new Bounds(Vector3.zero, 100000*Vector3.one);
         BillboardRenderParams.matProps                   = new MaterialPropertyBlock();
 
         BillboardRenderParams.matProps.SetBuffer         ("SimulationStateBuffer", SimulationStateBuffer                                        );
@@ -637,7 +639,7 @@ public class CPS : MonoBehaviour
         BillboardRenderParams.matProps.SetTexture        ("_BillboardTexture",     BillboardTexture                                             );
         
         MeshRenderParams                                 = new RenderParams(Instantiate(MeshMaterialTemplate)                                   );
-        MeshRenderParams.worldBounds                     = new Bounds(Vector3.zero, 10000*Vector3.one                                           );
+        MeshRenderParams.worldBounds                     = new Bounds(Vector3.zero, 100000*Vector3.one                                           );
         MeshRenderParams.material.enableInstancing       = true;
         MeshRenderParams.matProps                        = new MaterialPropertyBlock();
 
@@ -651,7 +653,7 @@ public class CPS : MonoBehaviour
     {
         if(_dispatchNum > 0 ) return _dispatchNum;
 
-        for(int i = 2; i <= 32; i*=2)
+        for(int i = 2; i <= CPS_NUM_GROUPS; i*=2)
         {
             if(MaximumParticleCount <= i*i*i*i)
             {

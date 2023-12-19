@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MarchMat
+  m_Name: AppendMarchMat
   m_Shader: {fileID: 4800000, guid: 88cda1fdc7f06ed45932609a11408eb5, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0

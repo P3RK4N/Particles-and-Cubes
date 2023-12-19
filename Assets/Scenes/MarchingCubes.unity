@@ -156,10 +156,12 @@ MonoBehaviour:
   MeshMaterial: {fileID: 2100000, guid: 21169c537e7313e44b20dacb1aa360b8, type: 2}
   MeshSize: 1
   ValueBorder: 0.5
-  MeshResolutionPerDim: 64
+  MeshResolutionPerDim: 128
   Octaves: 3
   Lacunarity: 2
   Frequency: 1
+  Offset: {x: 0, y: 0, z: 0}
+  Animate: 0
 --- !u!4 &120937459
 Transform:
   m_ObjectHideFlags: 0
@@ -401,7 +403,7 @@ Transform:
   m_GameObject: {fileID: 410087039}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalPosition: {x: 0, y: 1.46, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

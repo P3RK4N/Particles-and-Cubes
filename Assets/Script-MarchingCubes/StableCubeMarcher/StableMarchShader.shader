@@ -1,4 +1,4 @@
-Shader "Unlit/MarchShader"
+Shader "Unlit/StableMarchShader"
 {
     Properties
     {
@@ -25,7 +25,8 @@ Shader "Unlit/MarchShader"
             {
                                 float4 PositionCS   : SV_POSITION;
                                 float4 PositionWS   : TEXCOORD0;
-                nointerpolation int    Drop         : TEXCOORD1;
+                                float3 NormalWS     : TEXCOORD1;
+                nointerpolation int    Drop         : TEXCOORD2;
                                 // float  IsFrontFace  : SV_ISFRONTFACE;
             };
 
@@ -33,12 +34,20 @@ Shader "Unlit/MarchShader"
 
             uniform int     MaxVertices;
             
+            void GetNormalWS(in float3 a, in float3 b, in float3 c, inout float3 normal)
+            {
+                float3 vec1 = b - a;
+                float3 vec2 = c - a;
+                normal = normalize(cross(vec1, vec2));
+            };
+
             FRAG_IN vert (uint VertexID : SV_VertexID)
             {
                 InitIndirectDrawArgs(0); 
                 
                 uint id         = GetIndirectVertexID(VertexID);
-                
+                uint triId      = id - id % 3;
+
                 FRAG_IN OUT = (FRAG_IN)0;
                 OUT.Drop = 0;
 
@@ -54,6 +63,13 @@ Shader "Unlit/MarchShader"
 
                 OUT.PositionWS = float4(MeshBuffer[id].xyz, 1);
                 OUT.PositionCS = UnityWorldToClipPos(OUT.PositionWS);
+                GetNormalWS
+                (
+                    MeshBuffer[triId + 0].xyz,
+                    MeshBuffer[triId + 1].xyz,
+                    MeshBuffer[triId + 2].xyz,
+                    OUT.NormalWS
+                );
 
                 return OUT;
             }
@@ -63,10 +79,10 @@ Shader "Unlit/MarchShader"
                 if(IN.Drop == 1) discard;
 
                 float3 lightDir = UnityWorldSpaceLightDir(IN.PositionWS);
-                // float val = dot(lightDir, IN.Normal) * 0.5 + 0.5;
+                float ndotl = dot(lightDir, -IN.NormalWS) * 0.5 + 0.5;
+                float3 diffuse = max(0.2, ndotl) * float3(0.2, 0.7, 0.3)/* unity_LightColor0.rgb */;
 
-                // return half4(val, val, val, 1.0);
-                if(!isFront) return half4(1,1,1,1);
+                if(!isFront) return half4(diffuse, 1);
                 else         return half4(0,0,0,1);
             }
             

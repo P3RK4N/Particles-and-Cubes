@@ -1,0 +1,116 @@
+#pragma kernel March
+#pragma kernel MockMarch
+
+#include "Assets/Script-MarchingCubes/MarchingTable.hlsl"
+#include "Assets/Script-MarchingCubes/FastNoiseLite.hlsl"
+
+#define CM_GROUP_SIZE 8
+
+// Layout:
+// 1 float for determining valid point, 3 floats for point
+RWStructuredBuffer<float4> MeshBuffer;
+
+uniform float3  StartPosition;
+uniform float   MarchStep;
+uniform float   ValueBorder;
+uniform int     MeshResolutionPerDim;
+
+uniform int     Octaves;
+uniform float   Lacunarity;
+uniform float   Frequency;
+uniform float3  Offset;
+
+static const int VERTICES_PER_THREAD = 5 /* MAX_TRIANGLES */ * 3 /* Points */;
+
+[numthreads(CM_GROUP_SIZE,CM_GROUP_SIZE,CM_GROUP_SIZE)]
+void March(uint3 id : SV_DispatchThreadID)
+{
+
+}
+
+[numthreads(CM_GROUP_SIZE, CM_GROUP_SIZE, CM_GROUP_SIZE)]
+void MockMarch(uint3 id : SV_DispatchThreadID)
+{
+    /*  
+        #################################################
+        ############# Get world points ##################
+        #################################################
+    */
+     
+    if (id.x >= (uint)MeshResolutionPerDim || id.y >= (uint)MeshResolutionPerDim || id.z >= (uint)MeshResolutionPerDim)
+        return;
+    
+    float3 pos = StartPosition + id * MarchStep;
+    float3 posWS[8] =
+    {
+        pos + CornerOffsets[0] * MarchStep,
+        pos + CornerOffsets[1] * MarchStep,
+        pos + CornerOffsets[2] * MarchStep,
+        pos + CornerOffsets[3] * MarchStep,
+        pos + CornerOffsets[4] * MarchStep,
+        pos + CornerOffsets[5] * MarchStep,
+        pos + CornerOffsets[6] * MarchStep,
+        pos + CornerOffsets[7] * MarchStep
+    };
+    
+    /*
+        #################################################
+        ############# Find cube index ###################
+        #################################################
+    */
+    
+    
+    fnl_state state = fnlCreateState();
+    state.noise_type = FNL_NOISE_PERLIN;
+    state.fractal_type = FNL_FRACTAL_RIDGED;
+    state.frequency = Frequency;
+    state.octaves = Octaves;
+    state.lacunarity = Lacunarity;
+    
+    int cubeIndex = 0;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[0].x + Offset.x, posWS[0].y + Offset.y, posWS[0].z + Offset.z) < ValueBorder) << 0;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[1].x + Offset.x, posWS[1].y + Offset.y, posWS[1].z + Offset.z) < ValueBorder) << 1;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[2].x + Offset.x, posWS[2].y + Offset.y, posWS[2].z + Offset.z) < ValueBorder) << 2;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[3].x + Offset.x, posWS[3].y + Offset.y, posWS[3].z + Offset.z) < ValueBorder) << 3;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[4].x + Offset.x, posWS[4].y + Offset.y, posWS[4].z + Offset.z) < ValueBorder) << 4;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[5].x + Offset.x, posWS[5].y + Offset.y, posWS[5].z + Offset.z) < ValueBorder) << 5;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[6].x + Offset.x, posWS[6].y + Offset.y, posWS[6].z + Offset.z) < ValueBorder) << 6;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[7].x + Offset.x, posWS[7].y + Offset.y, posWS[7].z + Offset.z) < ValueBorder) << 7;
+
+    // Temporary
+    // cubeIndex = 174;
+    
+    /*
+        #################################################
+        ############# Append triangles ##################
+        #################################################
+    */
+    
+    // Flatten 3D Index to 1D
+    // I = x + yDx + zDxDy
+    int index1D = id.x + MeshResolutionPerDim * id.y + MeshResolutionPerDim * MeshResolutionPerDim * id.z;
+    index1D *= VERTICES_PER_THREAD; // Scale from Current March Cube to Current Vertex Offset
+    int i = 0;
+    
+    for (; i < VERTICES_PER_THREAD; i++)
+    {
+        if (TriangleTable[cubeIndex][i] == -1)
+            break;
+
+        MeshBuffer[index1D + i] = float4
+        (
+            (
+                posWS[EdgeConnections[TriangleTable[cubeIndex][i]][0]] +
+                posWS[EdgeConnections[TriangleTable[cubeIndex][i]][1]]
+            ) / 2.0,
+            1
+        );
+    }
+    
+    // Fill the rest of chunk with invalid vertices
+    //[unroll]
+    for (; i < VERTICES_PER_THREAD; i++)
+    {
+        MeshBuffer[index1D + i] = float4(0, 0, 0, 0);
+    }
+}

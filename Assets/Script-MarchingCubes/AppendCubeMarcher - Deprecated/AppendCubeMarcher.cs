@@ -11,8 +11,8 @@ public class AppendCubeMarcher : MonoBehaviour
     [SerializeField]
     [Range(0,1)]                float          ValueBorder             = 0.5f;
     [SerializeField]
-    [Range(1, 256)]              int           MeshResolutionPerDim    = 32;
-
+    [Range(1, 256)]             int            MeshResolutionPerDim    = 32;
+    [SerializeField]            int            MaxTriangleCount        = 10000;
     [Space(10)]
 
     [Header("Perlin Noise")]
@@ -32,6 +32,8 @@ public class AppendCubeMarcher : MonoBehaviour
     ComputeShader                   Marcher;
     GraphicsBuffer                  MeshBuffer;
     GraphicsBuffer                  CommandBuffer;
+    GraphicsBuffer                  TriangleCounterBuffer;
+    GraphicsBuffer                  CopyCounterBuffer;
     RenderParams                    MeshRenderParams;  
 
     void Awake()
@@ -44,7 +46,10 @@ public class AppendCubeMarcher : MonoBehaviour
 
     void OnDestroy()
     {
-        MeshBuffer.Release();
+        MeshBuffer              ?.Release();
+        CommandBuffer           ?.Release();
+        TriangleCounterBuffer   ?.Release();
+        CopyCounterBuffer       ?.Release();
     }
 
     void Update()
@@ -79,21 +84,28 @@ public class AppendCubeMarcher : MonoBehaviour
 
     void InitializeBuffers()
     {
-        MeshBuffer      = new GraphicsBuffer(Target.Structured, GetMaxTriangles() * 3 /*Points*/, sizeof(float) * 4 /*float4*/);
-        CommandBuffer   = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
-        CommandBuffer.SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs
+        MeshBuffer              = new GraphicsBuffer(Target.Structured, MaxTriangleCount * 3 /*Points*/, sizeof(float) * 4 /*float4*/);
+
+        CommandBuffer           = new GraphicsBuffer(Target.IndirectArguments, 1, IndirectDrawArgs.size);
+        CommandBuffer           .SetData(new IndirectDrawArgs[]{ new IndirectDrawArgs
         {
-            vertexCountPerInstance   = (uint)(GetMaxTriangles() * 3),
+            vertexCountPerInstance   = (uint)(MaxTriangleCount * 3),
             instanceCount            = 1
         }});
+
+        TriangleCounterBuffer   = new GraphicsBuffer(Target.Counter, 1, sizeof(int));
+        TriangleCounterBuffer   .SetCounterValue(0);
+
+        CopyCounterBuffer       = new GraphicsBuffer(Target.Counter, 1, sizeof(int));
+
     }
     
     void InitializeCompute()
     {
         Marcher = Instantiate(MarcherTemplate);
 
-        Marcher.SetBuffer(0, "MeshBuffer", MeshBuffer);
-        Marcher.SetBuffer(1, "MeshBuffer", MeshBuffer);
+        Marcher.SetBuffer(0, "MeshBuffer",      MeshBuffer);
+        Marcher.SetBuffer(0, "TriangleCounter", TriangleCounterBuffer);
     }
 
     void InitializeRenderContext()
@@ -133,8 +145,7 @@ public class AppendCubeMarcher : MonoBehaviour
 
         */
 
-        //Marcher.Dispatch(0, numGroups, numGroups, numGroups);
-        Marcher.Dispatch(1, numGroups, numGroups, numGroups);
+        Marcher.Dispatch(0, numGroups, numGroups, numGroups);
     }
 
     void AnimateMesh()

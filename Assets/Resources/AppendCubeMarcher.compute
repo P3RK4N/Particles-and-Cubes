@@ -1,4 +1,3 @@
-#pragma kernel March
 #pragma kernel MockMarch
 
 #include "Assets/Script-MarchingCubes/MarchingTable.hlsl"
@@ -8,12 +7,14 @@
 
 // Layout:
 // 1 float for determining valid point, 3 floats for point
-RWStructuredBuffer<float4> MeshBuffer;
+RWStructuredBuffer<float4>  MeshBuffer;
+RWStructuredBuffer<int>     TriangleCounter;
 
 uniform float3  StartPosition;
 uniform float   MarchStep;
 uniform float   ValueBorder;
 uniform int     MeshResolutionPerDim;
+uniform int     MaxTriangleCount;
 
 uniform int     Octaves;
 uniform float   Lacunarity;
@@ -21,12 +22,6 @@ uniform float   Frequency;
 uniform float3  Offset;
 
 static const int VERTICES_PER_THREAD = 5 /* MAX_TRIANGLES */ * 3 /* Points */;
-
-[numthreads(CM_GROUP_SIZE,CM_GROUP_SIZE,CM_GROUP_SIZE)]
-void March(uint3 id : SV_DispatchThreadID)
-{
-
-}
 
 [numthreads(CM_GROUP_SIZE, CM_GROUP_SIZE, CM_GROUP_SIZE)]
 void MockMarch(uint3 id : SV_DispatchThreadID)
@@ -94,6 +89,7 @@ void MockMarch(uint3 id : SV_DispatchThreadID)
     
     for (; i < VERTICES_PER_THREAD; i++)
     {
+        uint triangleIndex = TriangleCounter.IncrementCounter();
         if (TriangleTable[cubeIndex][i] == -1)
             break;
 

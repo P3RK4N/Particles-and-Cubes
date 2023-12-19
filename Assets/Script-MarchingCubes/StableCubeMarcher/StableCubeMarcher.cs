@@ -5,13 +5,14 @@ using static UnityEngine.GraphicsBuffer;
 
 public class StableCubeMarcher : MonoBehaviour
 {
+    [SerializeField]            bool           RenderMesh              = true;
     [SerializeField]            ComputeShader  MarcherTemplate         = null;
     [SerializeField]            Material       MeshMaterial            = null;
     [SerializeField]            float          MeshSize                = 1.0f;
     [SerializeField]
     [Range(0,1)]                float          ValueBorder             = 0.5f;
     [SerializeField]
-    [Range(1, 256)]              int           MeshResolutionPerDim    = 32;
+    [Range(1, 256)]             int            MeshResolutionPerDim    = 32;
 
     [Space(10)]
 
@@ -23,7 +24,6 @@ public class StableCubeMarcher : MonoBehaviour
     [SerializeField]
     [Range(0,10)]               float          Frequency               = 0.01f;
     [SerializeField]            Vector3        Offset                  = Vector3.zero;
-    [SerializeField]            bool           Animate                 = false;
 
 
     static readonly int             MaxTrianglesPerCube     = 5;
@@ -51,8 +51,10 @@ public class StableCubeMarcher : MonoBehaviour
     {
         if(Animate) AnimateMesh();
         if(Animate || transform.hasChanged) GenerateMesh();
+        transform.hasChanged = false;
 
-        Graphics.RenderPrimitivesIndirect(MeshRenderParams, MeshTopology.Triangles, CommandBuffer);
+        if(RenderMesh)
+            Graphics.RenderPrimitivesIndirect(MeshRenderParams, MeshTopology.Triangles, CommandBuffer);
     }
 
     void OnDrawGizmos()
@@ -137,25 +139,28 @@ public class StableCubeMarcher : MonoBehaviour
         Marcher.Dispatch(1, numGroups, numGroups, numGroups);
     }
 
+    [Space(10)]
+    [Header("Animation")]
+    [SerializeField]    bool    Animate                 = false;
+    [SerializeField]    float   FrequencySpeed          = 0.5f;
+    [SerializeField]    float   OffsetSpeed             = 0.2f;
+    [SerializeField]    float   LacunaritySpeed         = 0.8f;
+    
+
     void AnimateMesh()
     {
         // Frequency from 2 to 4
-        float freqSpeed = 0.5f;
-        float freq = Mathf.Sin(Time.time * freqSpeed) + 2;
+        float freq = Mathf.Sin(Time.time * FrequencySpeed) + 2;
 
         // Offset
-        float offsetSpeed = 1.3f;
-        Vector3 offsetDir = new Vector3(1.0f,0.33f, 0.7f).normalized * offsetSpeed * Time.deltaTime;
+        Vector3 offsetDir = new Vector3(Mathf.Sin(Time.time * OffsetSpeed), 0, Mathf.Cos(Time.time * OffsetSpeed));
 
         // Lacunarity from 0 to 3
-        float lacunaritySpeed = 1.0f;
-        float lacunarity = Mathf.Sin(Time.time * lacunaritySpeed) * 1.5f + 1.5f;
-
-
+        float lacunarity = Mathf.Sin(Time.time * LacunaritySpeed) * 1.5f + 1.5f;
 
         Frequency  = freq;
         Lacunarity = lacunarity;
-        //Offset    += offsetDir;
+        Offset     = offsetDir;
     }
 
     int GetMaxTriangles()

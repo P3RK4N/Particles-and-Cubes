@@ -6,6 +6,7 @@ Shader "Unlit/MarchShader"
     SubShader
     {
         Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
+        Cull Off
 
         Pass
         {
@@ -25,49 +26,48 @@ Shader "Unlit/MarchShader"
                                 float4 PositionCS   : SV_POSITION;
                                 float4 PositionWS   : TEXCOORD0;
                 nointerpolation int    Drop         : TEXCOORD1;
+                                // float  IsFrontFace  : SV_ISFRONTFACE;
             };
 
-            struct Triangle { float3 a,b,c; };
-            AppendStructuredBuffer<Triangle> MeshBuffer;
+            StructuredBuffer<float4> MeshBuffer;
 
-            uniform int MeshResolutionPerDim;
-
+            uniform int     MaxVertices;
+            
             FRAG_IN vert (uint VertexID : SV_VertexID)
             {
                 InitIndirectDrawArgs(0); 
                 
-                uint id = GetIndirectVertexID(VertexID);
-                uint triangleID = id / 3;
-                uint pointID    = id % 3;
+                uint id         = GetIndirectVertexID(VertexID);
                 
                 FRAG_IN OUT = (FRAG_IN)0;
+                OUT.Drop = 0;
 
-                if(id >= MeshResolutionPerDim * MeshResolutionPerDim * MeshResolutionPerDim)
+                if
+                (
+                    id >= (uint)MaxVertices
+                    || MeshBuffer[id].w == 0
+                )
                 {
                     OUT.Drop = 1;
                     return OUT;
                 }
 
-                switch(pointID)
-                {
-                    case 0: OUT.PositionWS = MeshBuffer[triangleID].a; break;
-                    case 1: OUT.PositionWS = MeshBuffer[triangleID].b; break;
-                    case 2: OUT.PositionWS = MeshBuffer[triangleID].c; break;
-                }
-                
+                OUT.PositionWS = float4(MeshBuffer[id].xyz, 1);
                 OUT.PositionCS = UnityWorldToClipPos(OUT.PositionWS);
 
                 return OUT;
             }
 
-            half4 frag (FRAG_IN IN) : SV_Target
+            half4 frag (FRAG_IN IN, bool isFront : SV_ISFRONTFACE) : SV_Target
             {
                 if(IN.Drop == 1) discard;
 
                 float3 lightDir = UnityWorldSpaceLightDir(IN.PositionWS);
-                float val = dot(lightDir, IN.Normal) * 0.5 + 0.5;
+                // float val = dot(lightDir, IN.Normal) * 0.5 + 0.5;
 
-                return half4(val, val, val, 1.0);
+                // return half4(val, val, val, 1.0);
+                if(!isFront) return half4(1,1,1,1);
+                else         return half4(0,0,0,1);
             }
             
             ENDCG

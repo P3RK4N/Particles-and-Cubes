@@ -1,6 +1,8 @@
 #pragma kernel March
+#pragma kernel MockMarch
 
 #include "Assets/Script-MarchingCubes/MarchingTable.hlsl"
+#include "Assets/Script-MarchingCubes/FastNoiseLite.hlsl"
 
 #define CM_GROUP_SIZE 8
 
@@ -13,34 +15,117 @@ uniform float   MarchStep;
 uniform float   ValueBorder;
 uniform int     MeshResolutionPerDim;
 
-static const int VERTICES_PER_THREAD = 3 /* POINTS */ * 15 /* MAX_TRIANGLES */;
-float Noise(float3 pos)
-{
-    return 0.0;
+uniform int     Octaves;
+uniform float   Lacunarity;
+uniform float   Frequency;
+
+static const int VERTICES_PER_THREAD = 5 /* MAX_TRIANGLES */ * 3 /* Points */;
+
+
+#ifndef RANDOM_FUNCS
+#define RANDOM_FUNCS
+
+/* discontinuous pseudorandom uniformly distributed in [-0.5, +0.5]^3 */
+float3 random3(float3 c)
+{ 
+    float j = 4096.0 * sin(dot(c, float3(17.0, 59.4, 15.0)));
+    float3 r;
+    r.z = frac(512.0 * j);
+    j *= .125;
+    r.x = frac(512.0 * j);
+    j *= .125;
+    r.y = frac(512.0 * j);
+    return r - 0.5;
 }
+
+/* skew constants for 3d simplex functions */
+const float F3 = 0.3333333;
+const float G3 = 0.1666667;
+
+/* 3d simplex noise */
+float simplex3d(float3 p)
+{
+	 /* 1. find current tetrahedron T and it's four vertices */
+	 /* s, s+i1, s+i2, s+1.0 - absolute skewed (integer) coordinates of T vertices */
+	 /* x, x1, x2, x3 - unskewed coordinates of p relative to each of T vertices*/
+	 
+	 /* calculate s and x */
+    float3 s = floor(p + dot(p, float3(F3, F3, F3)));
+    float3 x = p - s + dot(s, float3(G3, G3, G3));
+	 
+	 /* calculate i1 and i2 */
+    float3 e = step(float3(0, 0, 0), x - x.yzx);
+    float3 i1 = e * (1.0 - e.zxy);
+    float3 i2 = 1.0 - e.zxy * (1.0 - e);
+	 	
+	 /* x1, x2, x3 */
+    float3 x1 = x - i1 + G3;
+    float3 x2 = x - i2 + 2.0 * G3;
+    float3 x3 = x - 1.0 + 3.0 * G3;
+	 
+	 /* 2. find four surflets and store them in d */
+    float4 w, d;
+	 
+	 /* calculate surflet weights */
+    w.x = dot(x, x);
+    w.y = dot(x1, x1);
+    w.z = dot(x2, x2);
+    w.w = dot(x3, x3);
+	 
+	 /* w fades from 0.6 at the center of the surflet to 0.0 at the margin */
+    w = max(0.6 - w, 0.0);
+	 
+	 /* calculate surflet components */
+    d.x = dot(random3(s), x);
+    d.y = dot(random3(s + i1), x1);
+    d.z = dot(random3(s + i2), x2);
+    d.w = dot(random3(s + 1.0), x3);
+	 
+	 /* multiply d by w^4 */
+    w *= w;
+    w *= w;
+    d *= w;
+	 
+	 /* 3. return the sum of the four surflets */
+    return dot(d, float4(52, 52, 52, 52));
+}
+
+/* const matrices for 3d rotation */
+const float3x3 rot1 = float3x3(-0.37, 0.36, 0.85, -0.14, -0.93, 0.34, 0.92, 0.01, 0.4);
+const float3x3 rot2 = float3x3(-0.55, -0.39, 0.74, 0.33, -0.91, -0.24, 0.77, 0.12, 0.63);
+const float3x3 rot3 = float3x3(-0.71, 0.52, -0.47, -0.08, -0.72, -0.68, -0.7, -0.45, 0.56);
+
+#endif // RANDOM_FUNCS
 
 [numthreads(CM_GROUP_SIZE,CM_GROUP_SIZE,CM_GROUP_SIZE)]
 void March(uint3 id : SV_DispatchThreadID)
 {
-    /*
+
+}
+
+[numthreads(CM_GROUP_SIZE, CM_GROUP_SIZE, CM_GROUP_SIZE)]
+void MockMarch(uint3 id : SV_DispatchThreadID)
+{
+    /*  
         #################################################
         ############# Get world points ##################
         #################################################
     */
-    
-    if(id.x >= (uint)MeshResolutionPerDim || id.y >= (uint)MeshResolutionPerDim || id.z >= (uint)MeshResolutionPerDim) return;
+     
+    if (id.x >= (uint)MeshResolutionPerDim || id.y >= (uint)MeshResolutionPerDim || id.z >= (uint)MeshResolutionPerDim)
+        return;
     
     float3 pos = StartPosition + id * MarchStep;
-    float3 worldPositions[8] =
+    float3 posWS[8] =
     {
-        pos + CornerOffsets[0] * MarchStep * 0.5,
-        pos + CornerOffsets[1] * MarchStep * 0.5,
-        pos + CornerOffsets[2] * MarchStep * 0.5,
-        pos + CornerOffsets[3] * MarchStep * 0.5,
-        pos + CornerOffsets[4] * MarchStep * 0.5,
-        pos + CornerOffsets[5] * MarchStep * 0.5,
-        pos + CornerOffsets[6] * MarchStep * 0.5,
-        pos + CornerOffsets[7] * MarchStep * 0.5
+        pos + CornerOffsets[0] * MarchStep,
+        pos + CornerOffsets[1] * MarchStep,
+        pos + CornerOffsets[2] * MarchStep,
+        pos + CornerOffsets[3] * MarchStep,
+        pos + CornerOffsets[4] * MarchStep,
+        pos + CornerOffsets[5] * MarchStep,
+        pos + CornerOffsets[6] * MarchStep,
+        pos + CornerOffsets[7] * MarchStep
     };
     
     /*
@@ -49,16 +134,27 @@ void March(uint3 id : SV_DispatchThreadID)
         #################################################
     */
     
+    
+    fnl_state state = fnlCreateState();
+    state.noise_type = FNL_NOISE_PERLIN;
+    state.fractal_type = FNL_FRACTAL_RIDGED;
+    state.frequency = Frequency;
+    state.octaves = Octaves;
+    state.lacunarity = Lacunarity;
+    
     int cubeIndex = 0;
-    if(Noise(worldPositions[0]) < ValueBorder) cubeIndex |= 1;
-    if(Noise(worldPositions[1]) < ValueBorder) cubeIndex |= 2;
-    if(Noise(worldPositions[2]) < ValueBorder) cubeIndex |= 4;
-    if(Noise(worldPositions[3]) < ValueBorder) cubeIndex |= 8;
-    if(Noise(worldPositions[4]) < ValueBorder) cubeIndex |= 16;
-    if(Noise(worldPositions[5]) < ValueBorder) cubeIndex |= 32;
-    if(Noise(worldPositions[6]) < ValueBorder) cubeIndex |= 64;
-    if(Noise(worldPositions[7]) < ValueBorder) cubeIndex |= 128;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[0].x, posWS[0].y, posWS[0].z) < ValueBorder) << 0;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[1].x, posWS[1].y, posWS[1].z) < ValueBorder) << 1;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[2].x, posWS[2].y, posWS[2].z) < ValueBorder) << 2;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[3].x, posWS[3].y, posWS[3].z) < ValueBorder) << 3;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[4].x, posWS[4].y, posWS[4].z) < ValueBorder) << 4;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[5].x, posWS[5].y, posWS[5].z) < ValueBorder) << 5;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[6].x, posWS[6].y, posWS[6].z) < ValueBorder) << 6;
+    cubeIndex |= (int) (fnlGetNoise3D(state, posWS[7].x, posWS[7].y, posWS[7].z) < ValueBorder) << 7;
 
+    // Temporary
+    // cubeIndex = 174;
+    
     /*
         #################################################
         ############# Append triangles ##################
@@ -67,28 +163,29 @@ void March(uint3 id : SV_DispatchThreadID)
     
     // Flatten 3D Index to 1D
     // I = x + yDx + zDxDy
-    // id *= VERTICES_PER_THREAD; // Scale from Current March Cube to Current Vertex Offset
     int index1D = id.x + MeshResolutionPerDim * id.y + MeshResolutionPerDim * MeshResolutionPerDim * id.z;
     index1D *= VERTICES_PER_THREAD; // Scale from Current March Cube to Current Vertex Offset
     int i = 0;
     
-    // Fill valid vertices into mesh buffer
-    [unroll]
-    for(; i < 15; i++)
+    for (; i < VERTICES_PER_THREAD; i++)
     {
-        if(TriangleTable[cubeIndex][i] == -1) break;
+        if (TriangleTable[cubeIndex][i] == -1)
+            break;
 
-        MeshBuffer[index1D + i * 3 + 0] = float4(worldPositions[TriangleTable[cubeIndex][i + 0]], 1);
-        MeshBuffer[index1D + i * 3 + 1] = float4(worldPositions[TriangleTable[cubeIndex][i + 1]], 1);
-        MeshBuffer[index1D + i * 3 + 2] = float4(worldPositions[TriangleTable[cubeIndex][i + 2]], 1);
+        MeshBuffer[index1D + i] = float4
+        (
+            (
+                posWS[EdgeConnections[TriangleTable[cubeIndex][i]][0]] +
+                posWS[EdgeConnections[TriangleTable[cubeIndex][i]][1]]
+            ) / 2.0,
+            1
+        );
     }
     
     // Fill the rest of chunk with invalid vertices
-    [unroll]
-    for (; i <= 15; i++)
+    //[unroll]
+    for (; i < VERTICES_PER_THREAD; i++)
     {
-        MeshBuffer[index1D + i * 3 + 0] = float4(0, 0, 0, 0);
-        MeshBuffer[index1D + i * 3 + 1] = float4(0, 0, 0, 0);
-        MeshBuffer[index1D + i * 3 + 2] = float4(0, 0, 0, 0);
+        MeshBuffer[index1D + i] = float4(0, 0, 0, 0);
     }
 }

@@ -7,15 +7,16 @@ static const int EdgeConnections[12][2] = {
 		{0,4}, {1,5}, {2,6}, {3,7}
 };
 
-static const float3 CornerOffsets[8] = {
-		float3(0, 0, 1),
-		float3(1, 0, 1),
-		float3(1, 0, 0),
-		float3(0, 0, 0),
-		float3(0, 1, 1),
-		float3(1, 1, 1),
-		float3(1, 1, 0),
-		float3(0, 1, 0)
+static const float3 CornerOffsets[8] =
+{
+		float3(-0.5, -0.5,  0.5),
+		float3( 0.5, -0.5,  0.5),
+		float3( 0.5, -0.5, -0.5),
+		float3(-0.5, -0.5, -0.5),
+		float3(-0.5,  0.5,  0.5),
+		float3( 0.5,  0.5,  0.5),
+		float3( 0.5,  0.5, -0.5),
+		float3(-0.5,  0.5, -0.5)
 };
 
 static const int TriangleTable[256][16] = {

@@ -5,34 +5,34 @@ using static UnityEngine.GraphicsBuffer;
 
 public class StableCubeMarcher : MonoBehaviour
 {
-    [SerializeField]            bool           RenderMesh              = true;
-    [SerializeField]            ComputeShader  MarcherTemplate         = null;
-    [SerializeField]            Material       MeshMaterial            = null;
-    [SerializeField]            float          MeshSize                = 1.0f;
+    [SerializeField]            bool            RenderMesh              = true;
+    [SerializeField]            ComputeShader   MarcherTemplate         = null;
+    [SerializeField]            Material        MeshMaterial            = null;
+    [SerializeField]            float           MeshSize                = 1.0f;
     [SerializeField]
-    [Range(0,1)]                float          ValueBorder             = 0.5f;
+    [Range(0,1)]                float           ValueBorder             = 0.5f;
     [SerializeField]
-    [Range(1, 256)]             int            MeshResolutionPerDim    = 32;
+    [Range(1, 256)]             int             MeshResolutionPerDim    = 32;
 
     [Space(10)]
 
     [Header("Perlin Noise")]
     [SerializeField]
-    [Range(0,8)]                int            Octaves                 = 3;
+    [Range(0,8)]                int             Octaves                 = 3;
     [SerializeField]
-    [Range(0,10)]               float          Lacunarity              = 2.0f;
+    [Range(0,10)]               float           Lacunarity              = 2.0f;
     [SerializeField]
-    [Range(0,10)]               float          Frequency               = 0.01f;
-    [SerializeField]            Vector3        Offset                  = Vector3.zero;
+    [Range(0,10)]               float           Frequency               = 0.01f;
+    [SerializeField]            Vector3         Offset                  = Vector3.zero;
 
 
-    static readonly int             MaxTrianglesPerCube     = 5;
-    static readonly Vector3         Ones                    = new Vector3(1, 1, 1);
+    static readonly int                         MaxTrianglesPerCube     = 5;
+    static readonly Vector3                     Ones                    = new Vector3(1, 1, 1);
 
-    ComputeShader                   Marcher;
-    GraphicsBuffer                  MeshBuffer;
-    GraphicsBuffer                  CommandBuffer;
-    RenderParams                    MeshRenderParams;  
+    ComputeShader                               Marcher;
+    GraphicsBuffer                              MeshBuffer;
+    GraphicsBuffer                              CommandBuffer;
+    RenderParams                                MeshRenderParams;  
 
     void Awake()
     {

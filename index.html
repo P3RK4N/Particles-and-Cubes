@@ -75,15 +75,24 @@
             width: 60%;
         }
 
-        @media (max-width: 900px) {
+        iframe {
+            width: 640;
+            height: 480;
+        }
+
+        @media (max-width: 1300px) {
             .container {
                 flex-direction: column; /* Change to column on devices with a max width of 768px or less */
                 font-size: 10px;
+                width: auto;
             }
 
             .w40, .w60 {
-                width: 100%;
+                width: auto;
             }
+
+            /* iframe { */
+            /* } */
         }
     </style>
 </head>

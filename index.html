@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Web Page</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .section {
+            height: 300px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section:nth-child(odd) {
+            background-color: #2c3e50; /* Darker color for odd sections */
+        }
+
+        .section:nth-child(even) {
+            background-color: #34495e; /* Darker color for even sections */
+        }
+
+        .header {
+            font-size: 60px;
+            font-weight: bold;
+            color: #f7c6dc;
+            background: rgba(1, 1, 1, 0.5);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-shadow: -8px -8px 8px #000000, 8px -8px 8px #000000, -8px 8px 8px #000000, 8px 8px 8px #000000;
+        }
+
+        .header img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
+        h1 {
+            color: antiquewhite;
+        }
+
+        p, pre {
+            color: aliceblue;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="section">
+        <div class="header" style="background-image: url(https://i.redd.it/sqsauozrphm61.jpg); background-size: auto;">
+            Particle System
+            <img src="" alt="Background Image">
+        </div>
+    </div>
+
+    <div style="display: flex; width: 100%; height: auto; background-color: #274766; font-size: 20px; flex-direction: row; padding-bottom: 100px;">
+
+        <div style="display: flex; flex-direction: column; align-items: center; width: 60%; height: auto;">
+
+            <pre style="width: 100%; text-wrap: wrap;">    
+- Particle System features:
+    - Implemented fully on GPU via HLSL Compute Shaders
+    - MUCH faster than unity default particle system
+    - Easily scalable
+                
+- Performance(mobile 1660Ti 6GB | i7 9750h):
+    - Comfortably runs 4'000'000 particles at 40-60fps 
+                
+- Constraints:
+    - DirectX max buffer size
+        - Can be avoided by chunking
+    - Lot of GPU branching due to robust functionality
+        - Can be avoided by code specialization -> compiling variants
+    - Float precision causes weird artifacts
+        - Can be fixed by using double precision
+        - Not worth it
+    - Bad PRNG quality
+        - Can be fixed (just enough to not be seen) by trial and error
+        - Also not worth it
+        - Also not really scalable to more particles
+            </pre>
+            
+            <div style="width: 40%; align-items: center; display: flex; flex-direction: column; background-color: rgba(0.5,0.5,0.5); text-align: center;">
+
+                <h1>Forcefields</h1>
+                <iframe src="https://drive.google.com/file/d/1jRXQ4yUup22-Djz-Dj5q6tkPxU3OoAIe/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+                <p>This example shows usage of one attractor and one repulsor</p>
+
+                <h1>Stress Test</h1>
+                <iframe src="https://drive.google.com/file/d/1ZoVJOMfoYfpYwyVQH36E68cs1q1hbFsf/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+                <p>Here, we can see a lot of artifacts due to float accuracy and bad quality of PRNG</p>
+                <p style="color: red;">Sorry for bad video compression! It was impossible to get a good image without huge increase in size.</p>
+
+            </div>
+
+        </div>
+
+        <div style="width: 40vh; align-items: center; display: flex; flex-direction: column; background-color: rgba(0.5,0.5,0.5); text-align: center;">
+
+            <h1>Basic example</h1>
+            <iframe src="https://drive.google.com/file/d/1Blxo1iH_HhFgCDh9bEksgc8AlEuNeee8/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+            <p>Simple emitter which uses color, size, velocity and rotation settings</p>
+
+            <h1>Fire</h1>
+            <iframe src="https://drive.google.com/file/d/1lcDNbpodUo1FuMbJHycvNBFQgSCNZ9dp/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+            <p>An example use case of particle system</p>
+
+            <h1>Playground</h1>
+            <iframe src="https://drive.google.com/file/d/1yZUpdsad-kyDqbBVwdJZXw6VQKP5PruV/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+            <p>Playing with settings a little bit</p>
+
+        </div>
+
+    </div>
+
+    <div class="section">
+        <div class="header" style="background-image: url(https://cdna.artstation.com/p/assets/images/images/056/073/236/large/tycho-magnetic-anomaly-screenshot-5680.jpg?1668416584); background-size: auto;">
+            Cube Marcher
+            <img src="" alt="Background Image">
+        </div>
+    </div>
+
+    <div style="display: flex; width: 100%; height: auto; background-color: #654c70; font-size: 20px; flex-direction: row; padding-bottom: 100px;">
+
+        <div style="display: flex; flex-direction: column; align-items: center; width: 60%; height: auto;">
+
+            <pre style="width: 100%; text-wrap: wrap;">    
+- Cube Marcher features:
+    - Implemented fully on GPU via HLSL Compute Shaders
+    - Easily scalable
+    - Works globally -> chunkable
+
+- Performance:
+    - Comfortably runs 128x128x128 mesh resolution at 100+fps
+
+- Constraints:
+    - Non-constant shading not supported (+normal generation)
+        - Mesh postprocess on CPU
+        - Hardcode some NormalTable along with VertexTable
+        - Potentionaly include IndexBuffer too
+    - DirectX max buffer size
+        - Can be avoided by chunking
+    - In most cases, less than 10% of kernels will generate vertices
+    - The number will be even smaller on higher resolution
+    - Extreme memory (...and performance) bottleneck since all sub-chunks take memory
+    - Mesh usually doesnt need to be generated each frame in real use cases
+        - So this can be done offline with additional help of CPU
+    - Should be using append/consume buffers to save 90%+ memory
+            </pre>
+            
+        </div>
+
+        <div style="width: 40vh; align-items: center; display: flex; flex-direction: column; background-color: rgba(0.5,0.5,0.5); text-align: center;">
+
+            <h1>Marcher Showcase</h1>
+            <iframe src="https://drive.google.com/file/d/1yhD02XuGzNsYHq51cGEQ_5IhWZ9Npnmx/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
+            <p>Mesh generation in real time</p>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

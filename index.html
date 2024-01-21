@@ -15,6 +15,7 @@
             min-height: 300px;
             width: 100%;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             position: relative;
@@ -103,7 +104,14 @@
             <h1>Particle System</h1>
             <a href="https://github.com/P3RK4N/Particles-and-Cubes">visit github</a>
         </div>
+
+        <pre style="font-size: large; text-align: center;">
+            Wrote my own particle system in 4 days, hoping to outperform Unity's built-in solution
+            My solution ended up being faster dozen times than the official particle system, while keeping similar level of robustness
+            Still has a lot of room for improvement, some notes are down below
+        </pre>
     </div>
+
 
     <div class="container" style="display: flex; width: 100%; height: auto; background-color: #274766;padding-bottom: 100px;">
 
@@ -137,11 +145,11 @@
                 <h1><a href="https://drive.google.com/file/d/1jRXQ4yUup22-Djz-Dj5q6tkPxU3OoAIe/preview">Forcefields</a></h1>
                 <iframe src="https://drive.google.com/file/d/1jRXQ4yUup22-Djz-Dj5q6tkPxU3OoAIe/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
                 <p>This example shows usage of one attractor and one repulsor</p>
+                <p>Here, we can see a lot of artifacts due to float accuracy and bad quality of PRNG</p>
 
                 <h1><a href="https://drive.google.com/file/d/1ZoVJOMfoYfpYwyVQH36E68cs1q1hbFsf/preview">Stress Test</a></h1>
                 <iframe src="https://drive.google.com/file/d/1ZoVJOMfoYfpYwyVQH36E68cs1q1hbFsf/preview" width="640" height="480" allowfullscreen allow="autoplay"></iframe>
-                <p>Here, we can (acutally we can't due to poor compression) see a lot of artifacts due to float accuracy and bad quality of PRNG</p>
-                <p>Millions of particles simulated in playable framerate</p>
+                <p>Millions of particles simulated in 100+ frames per second</p>
                 <p style="color: red;">Sorry for bad video compression! It was impossible to get a good image without huge increase in size.</p>
 
             </div>
